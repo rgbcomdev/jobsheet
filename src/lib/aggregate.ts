@@ -121,13 +121,27 @@ export function monthHoursFor(
   return { total: round1(total), ot: round1(ot) };
 }
 
-export function getLatestEntryDate(entries: WorkEntry[], name: string) {
+export function getLatestEntryDate(entries: WorkEntry[], name?: string | null) {
   let latest: string | null = null;
   entries.forEach((e) => {
-    if ((e.owner || "") !== name) return;
+    if (name && (e.owner || "") !== name) return;
     if (!latest || e.date > latest) latest = e.date;
   });
   return latest;
+}
+
+/** 기록이 있는 최신 연·월 (없으면 오늘 기준) */
+export function getDefaultYearMonth(
+  entries: WorkEntry[],
+  name?: string | null
+) {
+  const today = new Date();
+  const latest = getLatestEntryDate(entries, name);
+  if (!latest) {
+    return { year: today.getFullYear(), month: today.getMonth() + 1 };
+  }
+  const [y, m] = latest.split("-").map(Number);
+  return { year: y, month: m };
 }
 
 export function formatUpdatedDate(dateStr: string | null) {

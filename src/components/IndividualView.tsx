@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useJobsheet } from "@/context/JobsheetContext";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/lib/constants";
 import {
   buildGroups,
+  getDefaultYearMonth,
   summarizeNoteForCell,
   summarizeTaskItem,
 } from "@/lib/aggregate";
@@ -35,7 +36,20 @@ export function IndividualView({ name }: { name: string }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
+  const [monthSynced, setMonthSynced] = useState(false);
   const [modalDate, setModalDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMonthSynced(false);
+  }, [name]);
+
+  useEffect(() => {
+    if (loading || monthSynced) return;
+    const { year: y, month: m } = getDefaultYearMonth(data.entries, name);
+    setYear(y);
+    setMonth(m);
+    setMonthSynced(true);
+  }, [loading, data.entries, name, monthSynced]);
 
   const monthPrefix = `${year}-${pad(month)}`;
 

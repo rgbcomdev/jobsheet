@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useJobsheet } from "@/context/JobsheetContext";
-import { buildGroups, deriveMajorSub } from "@/lib/aggregate";
+import {
+  buildGroups,
+  deriveMajorSub,
+  getDefaultYearMonth,
+} from "@/lib/aggregate";
 import { classifyDesignOrPublish, computeDuration, round1 } from "@/lib/time";
 import { STAGES } from "@/lib/constants";
 import { fmWon } from "@/lib/estimate";
@@ -15,7 +19,16 @@ export function TeamKpiView() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
+  const [monthSynced, setMonthSynced] = useState(false);
   const [tab, setTab] = useState<TeamTab>("전체");
+
+  useEffect(() => {
+    if (loading || monthSynced) return;
+    const { year: y, month: m } = getDefaultYearMonth(data.entries);
+    setYear(y);
+    setMonth(m);
+    setMonthSynced(true);
+  }, [loading, data.entries, monthSynced]);
 
   const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
 
