@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from "crypto";
-
 export const ADMIN_COOKIE = "rgb_admin_session";
 
 function getSecret() {
@@ -17,27 +15,54 @@ export function getAdminCredentials() {
   };
 }
 
-export function signAdminSession(username: string, maxAgeSec = 60 * 60 * 24 * 7) {
+function toHex(buf: ArrayBuffer) {
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function timingSafeEqualHex(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) {
+    out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return out === 0;
+}
+
+async function hmacHex(payload: string, secret: string) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
+  return toHex(sig);
+}
+
+export async function signAdminSession(
+  username: string,
+  maxAgeSec = 60 * 60 * 24 * 7
+) {
   const exp = Math.floor(Date.now() / 1000) + maxAgeSec;
   const payload = `${username}.${exp}`;
-  const sig = createHmac("sha256", getSecret()).update(payload).digest("hex");
+  const sig = await hmacHex(payload, getSecret());
   return `${payload}.${sig}`;
 }
 
-export function verifyAdminSession(token: string | undefined | null): boolean {
+export async function verifyAdminSession(
+  token: string | undefined | null
+): Promise<boolean> {
   if (!token) return false;
   const parts = token.split(".");
   if (parts.length !== 3) return false;
   const [username, expStr, sig] = parts;
   const payload = `${username}.${expStr}`;
-  const expected = createHmac("sha256", getSecret()).update(payload).digest("hex");
-  try {
-    const a = Buffer.from(sig);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
-  } catch {
-    return false;
-  }
+  const expected = await hmacHex(payload, getSecret());
+  if (!timingSafeEqualHex(sig, expected)) return false;
   const exp = Number(expStr);
   if (!Number.isFinite(exp) || exp < Math.floor(Date.now() / 1000)) return false;
   const { id } = getAdminCredentials();
@@ -46,11 +71,15 @@ export function verifyAdminSession(token: string | undefined | null): boolean {
 
 export function validateAdminLogin(id: string, password: string) {
   const cred = getAdminCredentials();
-  const idOk =
-    id.length === cred.id.length &&
-    timingSafeEqual(Buffer.from(id), Buffer.from(cred.id));
-  const pwOk =
-    password.length === cred.password.length &&
-    timingSafeEqual(Buffer.from(password), Buffer.from(cred.password));
-  return idOk && pwOk;
+  if (id.length !== cred.id.length || password.length !== cred.password.length) {
+    return false;
+  }
+  let out = 0;
+  for (let i = 0; i < id.length; i++) {
+    out |= id.charCodeAt(i) ^ cred.id.charCodeAt(i);
+  }
+  for (let i = 0; i < password.length; i++) {
+    out |= password.charCodeAt(i) ^ cred.password.charCodeAt(i);
+  }
+  return out === 0;
 }

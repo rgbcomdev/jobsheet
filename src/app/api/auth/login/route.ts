@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const token = signAdminSession(id);
+  const token = await signAdminSession(id);
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE, token, {
     httpOnly: true,

@@ -1,11 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/admin";
 
@@ -27,27 +26,26 @@ export default function LoginForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || "로그인에 실패했습니다.");
+        setLoading(false);
         return;
       }
-      router.replace(next.startsWith("/") ? next : "/admin");
-      router.refresh();
+      // 쿠키가 반영된 뒤 미들웨어를 통과하도록 풀 리로드
+      window.location.assign(next.startsWith("/") ? next : "/admin");
     } catch {
       setError("네트워크 오류가 발생했습니다.");
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="wrap" style={{ maxWidth: 420, paddingTop: 80 }}>
+      <div style={{ marginBottom: 14 }}>
+        <Link href="/" className="back-btn">
+          ← 대시보드
+        </Link>
+      </div>
       <div className="admin-page-section" style={{ margin: 0 }}>
-        <div className="dash-head" style={{ marginBottom: 8 }}>
-          <Link href="/" className="back-btn">
-            ← 대시보드
-          </Link>
-          <h1>관리자 로그인</h1>
-          <div />
-        </div>
+        <h1 style={{ fontSize: 20, margin: "0 0 8px" }}>관리자 로그인</h1>
         <p className="admin-sub" style={{ marginTop: 0 }}>
           통합관리 페이지는 관리자 계정으로 로그인한 뒤 이용할 수 있습니다.
         </p>
