@@ -4,6 +4,7 @@ import {
   DEFAULT_GRADE_DAILY_RATE,
   DEFAULT_PROJECT_TYPES_BY_MAJOR,
 } from "../constants";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function emptySeed(): JobsheetSeed {
   return {
@@ -35,12 +36,34 @@ export async function loadSeedFromPublic(): Promise<JobsheetSeed> {
   return res.json();
 }
 
+async function fetchAll(
+  supabase: SupabaseClient,
+  table: string,
+  pageSize = 1000
+) {
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .range(from, to);
+    if (error) throw error;
+    if (!data?.length) break;
+    rows.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return rows;
+}
+
 export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
 
+  const employees = await fetchAll(supabase, "employees");
+  if (!employees.length) return null; // not seeded yet
+
   const [
-    employees,
     companies,
     entries,
     statuses,
@@ -52,84 +75,85 @@ export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
     personEstimates,
     overrides,
   ] = await Promise.all([
-    supabase.from("employees").select("*"),
-    supabase.from("companies").select("*"),
-    supabase.from("entries").select("*"),
-    supabase.from("project_statuses").select("*"),
-    supabase.from("leaves").select("*"),
-    supabase.from("public_duties").select("*"),
-    supabase.from("holidays").select("*"),
-    supabase.from("grade_rates").select("*"),
-    supabase.from("estimates").select("*"),
-    supabase.from("person_estimates").select("*"),
-    supabase.from("task_item_overrides").select("*"),
+    fetchAll(supabase, "companies"),
+    fetchAll(supabase, "entries"),
+    fetchAll(supabase, "project_statuses"),
+    fetchAll(supabase, "leaves"),
+    fetchAll(supabase, "public_duties"),
+    fetchAll(supabase, "holidays"),
+    fetchAll(supabase, "grade_rates"),
+    fetchAll(supabase, "estimates"),
+    fetchAll(supabase, "person_estimates"),
+    fetchAll(supabase, "task_item_overrides"),
   ]);
 
-  if (employees.error) throw employees.error;
-  if (!employees.data?.length) return null; // not seeded yet
-
   const seed = emptySeed();
-  employees.data.forEach((e) => {
-    if (!seed.employees[e.team]) seed.employees[e.team] = [];
-    seed.employees[e.team].push(e.name);
-    seed.staffGrade[e.name] = e.grade;
-    if (e.role) seed.staffRole[e.name] = e.role;
+  employees.forEach((e) => {
+    const team = String(e.team);
+    const name = String(e.name);
+    if (!seed.employees[team]) seed.employees[team] = [];
+    seed.employees[team].push(name);
+    seed.staffGrade[name] = String(e.grade);
+    if (e.role) seed.staffRole[name] = String(e.role);
     if (e.daily_rate_override != null) {
-      seed.staffDailyRateOverride[e.name] = Number(e.daily_rate_override);
+      seed.staffDailyRateOverride[name] = Number(e.daily_rate_override);
     }
-    if (e.is_former) seed.formerEmployees.push(e.name);
+    if (e.is_former) seed.formerEmployees.push(name);
   });
 
-  (companies.data || []).forEach((c) => {
-    seed.companyMaster.push(c.name);
-    seed.companyCat[c.name] = {
-      major: c.major || undefined,
-      cat: c.category || undefined,
-      task: c.task || undefined,
-      sm: c.start_month || undefined,
-      assignee: c.assignee || undefined,
+  companies.forEach((c) => {
+    const name = String(c.name);
+    seed.companyMaster.push(name);
+    seed.companyCat[name] = {
+      major: (c.major as string) || undefined,
+      cat: (c.category as string) || undefined,
+      task: (c.task as string) || undefined,
+      sm: (c.start_month as string) || undefined,
+      assignee: (c.assignee as string) || undefined,
     };
   });
 
-  seed.entries = (entries.data || []).map((e) => ({
-    id: e.id,
-    date: e.date,
-    owner: e.owner,
-    start: e.start_time,
-    end: e.end_time,
-    company: e.company || "",
-    project: e.project || "",
-    stage: e.stage || "본작업",
-    note: e.note || "",
+  seed.entries = entries.map((e) => ({
+    id: e.id as string | undefined,
+    date: String(e.date),
+    owner: String(e.owner),
+    start: String(e.start_time),
+    end: String(e.end_time),
+    company: String(e.company || ""),
+    project: String(e.project || ""),
+    stage: String(e.stage || "본작업"),
+    note: String(e.note || ""),
   }));
 
-  (statuses.data || []).forEach((s) => {
-    seed.projectStatus[`${s.company}|||${s.project}`] = s.status;
+  statuses.forEach((s) => {
+    seed.projectStatus[`${s.company}|||${s.project}`] = String(s.status);
   });
-  (leaves.data || []).forEach((l) => {
-    seed.leaveData[`${l.employee_name}|||${l.date}`] = l.leave_type;
+  leaves.forEach((l) => {
+    seed.leaveData[`${l.employee_name}|||${l.date}`] = String(l.leave_type);
   });
-  (duties.data || []).forEach((d) => {
-    seed.publicDutyData[`${d.employee_name}|||${d.date}`] = d.duty_type;
+  duties.forEach((d) => {
+    seed.publicDutyData[`${d.employee_name}|||${d.date}`] = String(
+      d.duty_type
+    );
   });
-  (holidays.data || []).forEach((h) => {
-    seed.holidays[h.date] = h.name;
+  holidays.forEach((h) => {
+    seed.holidays[String(h.date)] = String(h.name);
   });
-  (grades.data || []).forEach((g) => {
-    seed.gradeDailyRate[g.grade] = Number(g.daily_rate);
+  grades.forEach((g) => {
+    seed.gradeDailyRate[String(g.grade)] = Number(g.daily_rate);
   });
-  (estimates.data || []).forEach((e) => {
+  estimates.forEach((e) => {
     seed.estimates[`${e.company}|||${e.project}`] = Number(e.amount_manwon);
   });
-  (personEstimates.data || []).forEach((e) => {
+  personEstimates.forEach((e) => {
     seed.personEstimates[`${e.company}|||${e.project}|||${e.person}`] = Number(
       e.amount_manwon
     );
   });
-  (overrides.data || []).forEach((o) => {
+  overrides.forEach((o) => {
     seed.taskItemOverrides[
       `${o.owner}|||${o.company}|||${o.category}|||${o.auto_key}`
-    ] = o.label;
+    ] = String(o.label);
   });
 
   return seed;

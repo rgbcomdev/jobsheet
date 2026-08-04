@@ -96,9 +96,11 @@
 
   .backup-actions { display: flex; gap: 8px; }
   .backup-btn { font-family: inherit; font-size: 12.5px; padding: 7px 14px; border-radius: 8px;
-    border: 0.5px solid var(--border-strong); background: #fff; color: var(--text-secondary); cursor: pointer; }
+    border: 0.5px solid var(--border-strong); background: #fff; color: var(--text-secondary); cursor: pointer;
+    display: inline-flex; align-items: center; flex-direction: row; gap: 5px; }
   .backup-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-icon { width: 14px; height: 14px; vertical-align: -2.5px; margin-right: 5px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .btn-icon { width: 14px; height: 14px; flex-shrink: 0; display: inline-block; margin-right: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .admin-btn { display: inline-flex; align-items: center; flex-direction: row; gap: 6px; }
 
   .cal-card { background: var(--card); border: 0.5px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 20px; }
   .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 6px; }

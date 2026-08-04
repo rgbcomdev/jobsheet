@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "extract-data": "node scripts/extract-data.mjs",
-    "seed": "node --env-file=.env.local scripts/seed-to-supabase.mjs"
+    "seed": "node --env-file=.env.local scripts/seed-to-supabase.mjs",
+    "db:migrate": "node --env-file=.env.local scripts/apply-migration.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",
     "next": "16.3.0",
+    "pg": "^8.22.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "xlsx": "^0.18.5"
