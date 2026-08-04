@@ -323,6 +323,9 @@ export function IndividualView({ name }: { name: string }) {
             <span className="sv ot">{monthStats.ot}h</span>
           </div>
           <div className="backup-actions">
+            <Link href="/manual" className="backup-btn">
+              매뉴얼 보기
+            </Link>
             <button
               type="button"
               className="backup-btn"

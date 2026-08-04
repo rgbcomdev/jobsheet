@@ -85,6 +85,9 @@ export function AdminView() {
         </Link>
         <h1>통합관리</h1>
         <div style={{ display: "flex", gap: 8 }}>
+          <Link href="/manual" className="backup-btn">
+            매뉴얼 보기
+          </Link>
           <Link href="/admin/team" className="backup-btn">
             전체 직원 통합 보기 (KPI)
           </Link>

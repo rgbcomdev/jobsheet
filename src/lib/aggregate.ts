@@ -121,12 +121,15 @@ export function monthHoursFor(
   return { total: round1(total), ot: round1(ot) };
 }
 
-export function getLatestEntryDate(entries: WorkEntry[], name?: string | null) {
+export function getLatestEntryDate(
+  entries: WorkEntry[],
+  name?: string | null
+): string | null {
   let latest: string | null = null;
-  entries.forEach((e) => {
-    if (name && (e.owner || "") !== name) return;
+  for (const e of entries) {
+    if (name != null && name !== "" && (e.owner || "") !== name) continue;
     if (!latest || e.date > latest) latest = e.date;
-  });
+  }
   return latest;
 }
 
@@ -134,10 +137,10 @@ export function getLatestEntryDate(entries: WorkEntry[], name?: string | null) {
 export function getDefaultYearMonth(
   entries: WorkEntry[],
   name?: string | null
-) {
+): { year: number; month: number } {
   const today = new Date();
   const latest = getLatestEntryDate(entries, name);
-  if (!latest) {
+  if (latest == null) {
     return { year: today.getFullYear(), month: today.getMonth() + 1 };
   }
   const [y, m] = latest.split("-").map(Number);

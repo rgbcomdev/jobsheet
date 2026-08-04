@@ -44,6 +44,9 @@ export function DashboardView() {
               로컬 시드
             </span>
           )}
+          <Link href="/manual" className="backup-btn">
+            매뉴얼 보기
+          </Link>
           <Link href="/admin" className="backup-btn admin-btn">
             <svg className="btn-icon" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="3" />

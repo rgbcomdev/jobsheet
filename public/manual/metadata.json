@@ -1,0 +1,78 @@
+{
+  "source": "rgb_manual_v1.15.html",
+  "parts": [
+    {
+      "id": "part-1",
+      "title": "1업무일지 작성법"
+    },
+    {
+      "id": "part-2",
+      "title": "2화면 연결 구조"
+    },
+    {
+      "id": "part-3",
+      "title": "3연차/반차 처리"
+    },
+    {
+      "id": "part-4",
+      "title": "4디자인팀 유의사항"
+    },
+    {
+      "id": "part-5",
+      "title": "5영상팀 유의사항"
+    },
+    {
+      "id": "part-6",
+      "title": "6자주 발생하는 오류"
+    }
+  ],
+  "images": [
+    {
+      "index": 1,
+      "file": "shot-dashboard.jpg",
+      "bytes": 291815,
+      "name": "shot-dashboard"
+    },
+    {
+      "index": 2,
+      "file": "shot-admin.jpg",
+      "bytes": 415198,
+      "name": "shot-admin"
+    },
+    {
+      "index": 3,
+      "file": "shot-calendar-input.jpg",
+      "bytes": 289305,
+      "name": "shot-calendar-input"
+    },
+    {
+      "index": 4,
+      "file": "shot-category.jpg",
+      "bytes": 316619,
+      "name": "shot-category"
+    },
+    {
+      "index": 5,
+      "file": "shot-calendar-full.jpg",
+      "bytes": 731431,
+      "name": "shot-calendar-full"
+    },
+    {
+      "index": 6,
+      "file": "shot-project-accum.jpg",
+      "bytes": 722062,
+      "name": "shot-project-accum"
+    },
+    {
+      "index": 7,
+      "file": "shot-leave.jpg",
+      "bytes": 168312,
+      "name": "shot-leave"
+    }
+  ],
+  "fonts": [
+    "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">",
+    "<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>",
+    "<link href=\"https://fonts.googleapis.com/css2?family=Gabarito:wght@800&family=Inter:wght@400;500;600;700;800&display=swap\" rel=\"stylesheet\">"
+  ]
+}

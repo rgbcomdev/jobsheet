@@ -79,8 +79,50 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   const leaveType = getLeave(owner, date);
   const publicDuty = getPublicDuty(owner, date);
 
+  const defaultDayRows = (): WorkEntry[] => [
+    {
+      date,
+      owner,
+      start: "09:00",
+      end: "12:00",
+      company: "",
+      project: "",
+      note: "",
+      stage: "본작업",
+    },
+    {
+      date,
+      owner,
+      start: "13:00",
+      end: "18:00",
+      company: "",
+      project: "",
+      note: "",
+      stage: "본작업",
+    },
+  ];
+
   const updateRow = (i: number, patch: Partial<WorkEntry>) => {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  };
+
+  const clearLeave = () => {
+    setLeave(owner, date, "");
+    setRows((prev) => (prev.length ? prev : defaultDayRows()));
+  };
+
+  const applyLeaveType = (type: string) => {
+    // 같은 유형을 다시 누르면 휴가 해제
+    if (type && type === leaveType) {
+      clearLeave();
+      return;
+    }
+    setLeave(owner, date, type);
+    if (!type) {
+      setRows((prev) => (prev.length ? prev : defaultDayRows()));
+      return;
+    }
+    applyLeaveDefaults(type);
   };
 
   const applyLeaveDefaults = (type: string) => {
@@ -136,11 +178,40 @@ export function DayModal({ owner, date, open, onClose }: Props) {
           .filter((e) => !(e.end <= "11:00"))
           .map((e) => (e.start < "11:00" ? { ...e, start: "11:00" } : e));
         if (!next.length) {
+          // v17: 점심 제외 두 블록
           next = [
             {
               date,
               owner,
               start: "11:00",
+              end: "12:00",
+              company: "",
+              project: "",
+              note: "",
+              stage: "본작업",
+            },
+            {
+              date,
+              owner,
+              start: "13:00",
+              end: "18:00",
+              company: "",
+              project: "",
+              note: "",
+              stage: "본작업",
+            },
+          ];
+        } else if (
+          next.length === 1 &&
+          next[0].start === "11:00" &&
+          next[0].end === "18:00"
+        ) {
+          next = [
+            { ...next[0], end: "12:00" },
+            {
+              date,
+              owner,
+              start: "13:00",
               end: "18:00",
               company: "",
               project: "",
@@ -162,6 +233,34 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               date,
               owner,
               start: "09:00",
+              end: "12:00",
+              company: "",
+              project: "",
+              note: "",
+              stage: "본작업",
+            },
+            {
+              date,
+              owner,
+              start: "13:00",
+              end: "16:00",
+              company: "",
+              project: "",
+              note: "",
+              stage: "본작업",
+            },
+          ];
+        } else if (
+          next.length === 1 &&
+          next[0].start === "09:00" &&
+          next[0].end === "16:00"
+        ) {
+          next = [
+            { ...next[0], end: "12:00" },
+            {
+              date,
+              owner,
+              start: "13:00",
               end: "16:00",
               company: "",
               project: "",
@@ -251,26 +350,40 @@ export function DayModal({ owner, date, open, onClose }: Props) {
             onClick={() => setLeaveOpen((v) => !v)}
           >
             {leaveType
-              ? `휴가 처리됨: ${leaveType} (변경/해제하려면 클릭)`
+              ? `휴가 처리됨: ${leaveType}`
               : "오늘 연차/반차 처리"}
           </button>
+          {leaveType && (
+            <button
+              type="button"
+              className="leave-clear-btn"
+              onClick={clearLeave}
+            >
+              휴가 해제
+            </button>
+          )}
           {leaveOpen && (
             <div className="leave-panel" style={{ display: "flex" }}>
               <span className="leave-panel-label">휴가</span>
-              <select
-                value={leaveType}
-                onChange={(e) => {
-                  setLeave(owner, date, e.target.value);
-                  applyLeaveDefaults(e.target.value);
-                }}
-              >
-                <option value="">선택 안 함</option>
+              <div className="leave-type-chips">
                 {LEAVE_TYPES.map((t) => (
-                  <option key={t} value={t}>
+                  <button
+                    key={t}
+                    type="button"
+                    className={
+                      "leave-type-chip" + (leaveType === t ? " active" : "")
+                    }
+                    onClick={() => applyLeaveType(t)}
+                    title={
+                      leaveType === t
+                        ? "다시 누르면 휴가 해제"
+                        : `${t} 적용`
+                    }
+                  >
                     {t}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
               <span className="leave-panel-label">공공업무</span>
               <select
                 value={publicDuty}
@@ -279,8 +392,18 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                 <option value="">없음</option>
                 <option value="공공업무">공공업무</option>
               </select>
+              {publicDuty && (
+                <button
+                  type="button"
+                  className="leave-clear-btn"
+                  onClick={() => setPublicDuty(owner, date, "")}
+                >
+                  공공업무 해제
+                </button>
+              )}
               <span className="leave-panel-note">
-                연차/반차는 근무시간 합계에서 제외됩니다
+                같은 휴가 유형을 다시 누르거나 &apos;휴가 해제&apos;로 삭제할 수
+                있습니다. 연차/반차는 근무시간 합계에서 제외됩니다.
               </span>
             </div>
           )}
