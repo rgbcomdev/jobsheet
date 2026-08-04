@@ -20,30 +20,29 @@ http://localhost:3000
 
 ## Supabase 설정
 
-1. Supabase 프로젝트 생성
-2. SQL Editor에서 [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) 실행
-3. `.env.local` 작성:
+1. SQL Editor에서 [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) 실행
+2. `.env.local` 작성:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://sdnvdboqgxwdwviwmjit.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
-4. 시드 적재:
+3. 시드 적재:
 
 ```bash
 npm run extract-data   # HTML → data/seed.json (이미 생성됨)
 npm run seed           # seed.json → Supabase
 ```
 
-5. 시드 후 앱을 새로고침하면 `source=supabase`로 로드됩니다.
+4. 시드 후 앱을 새로고침하면 `source=supabase`로 로드됩니다.
 
 > 현재 RLS는 **anon CRUD 전체 허용**(공개 운영). 추후 관리자 Auth 추가 시 정책을 읽기 공개 / 쓰기 authenticated로 교체하세요.
 
 ## Vercel 배포
 
-1. GitHub에 푸시 후 [Vercel](https://vercel.com)에서 Import
+1. GitHub 연동 후 [Vercel](https://vercel.com)에서 Import (`rgbcomdev/jobsheet`)
 2. Environment Variables에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` 등록
 3. Deploy
 4. (최초 1회) 로컬에서 `npm run seed`로 DB 시드
