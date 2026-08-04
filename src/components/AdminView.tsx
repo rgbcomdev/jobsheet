@@ -194,9 +194,10 @@ export function AdminView() {
           <table className="agg admin-list-table">
             <thead>
               <tr>
-                <th className="col-name">이름</th>
+                <th>이름</th>
                 <th>팀</th>
                 <th>직급</th>
+                <th>KPI</th>
                 <th>수정</th>
                 <th>삭제</th>
               </tr>
@@ -204,9 +205,17 @@ export function AdminView() {
             <tbody>
               {employeeRows.map((r) => (
                 <tr key={r.name} className={r.isFormer ? "row-former" : ""}>
-                  <td className="col-name">{r.name}</td>
+                  <td>{r.name}</td>
                   <td>{r.team}팀</td>
                   <td>{r.grade}</td>
+                  <td>
+                    <Link
+                      href={`/e/${encodeURIComponent(r.name)}`}
+                      className="edit-row-btn"
+                    >
+                      KPI 보기
+                    </Link>
+                  </td>
                   <td>
                     <button
                       type="button"

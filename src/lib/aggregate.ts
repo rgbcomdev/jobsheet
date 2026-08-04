@@ -1,5 +1,5 @@
-import { TASK_STAGE_SUFFIX } from "./constants";
-import type { WorkEntry } from "./types";
+import { TASK_STAGE_SUFFIX, DEFAULT_PROJECT_TYPES_BY_MAJOR, MAJORS } from "./constants";
+import type { CompanyInfo, WorkEntry } from "./types";
 import { computeDuration, computeOvertime, pad, round1 } from "./time";
 
 export function summarizeNoteForCell(note: string, company: string) {
@@ -134,4 +134,34 @@ export function formatUpdatedDate(dateStr: string | null) {
   if (!dateStr) return "기록 없음";
   const [, m, d] = dateStr.split("-");
   return `${Number(m)}월 ${Number(d)}일 업데이트`;
+}
+
+/** 실제 입력된 project 값으로 대분류(디자인/동영상)를 판별. 없으면 업체 마스터로 대체. */
+export function deriveMajorSub(
+  project: string,
+  company: string,
+  companyCat: Record<string, CompanyInfo>,
+  projectTypesByMajor?: Record<string, string[]>
+) {
+  const types = projectTypesByMajor || DEFAULT_PROJECT_TYPES_BY_MAJOR;
+  for (const mj of MAJORS) {
+    if ((types[mj] || []).includes(project)) {
+      return { major: mj, sub: project };
+    }
+  }
+  if (company === "RGB내부" || project === "RGB내부업무") {
+    return { major: "디자인", sub: project || "RGB내부업무" };
+  }
+  const info = companyCat[company];
+  if (info?.major) {
+    return {
+      major: info.major === "영상" ? "동영상" : info.major,
+      sub: info.cat || project || "미분류",
+    };
+  }
+  // 영상 카테고리 키워드 폴백
+  if (["모션영상", "3D영상", "촬영영상"].includes(project)) {
+    return { major: "동영상", sub: project };
+  }
+  return { major: "디자인", sub: project || "미분류" };
 }

@@ -15,6 +15,7 @@ import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Ctx = {
   loading: boolean;
+  loadError: string | null;
   source: "supabase" | "local" | null;
   data: JobsheetSeed;
   setData: React.Dispatch<React.SetStateAction<JobsheetSeed>>;
@@ -50,6 +51,7 @@ const JobsheetContext = createContext<Ctx | null>(null);
 
 export function JobsheetProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [source, setSource] = useState<"supabase" | "local" | null>(null);
   const [data, setData] = useState<JobsheetSeed>({
     version: 2,
@@ -75,18 +77,41 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await loadJobsheetData();
       setData(res.data);
       setSource(res.source);
+    } catch (e) {
+      console.error(e);
+      setLoadError(e instanceof Error ? e.message : "데이터 로드 실패");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const res = await loadJobsheetData();
+        if (cancelled) return;
+        setData(res.data);
+        setSource(res.source);
+      } catch (e) {
+        if (cancelled) return;
+        console.error(e);
+        setLoadError(e instanceof Error ? e.message : "데이터 로드 실패");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const getStatus = useCallback(
     (company: string, project: string) =>
@@ -388,6 +413,7 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
 
   const value: Ctx = {
     loading,
+    loadError,
     source,
     data,
     setData,

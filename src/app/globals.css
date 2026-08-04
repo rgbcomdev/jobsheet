@@ -248,13 +248,12 @@
   .role-badge.role-퍼블 { background: #eef1f7; color: #4a5a7a; }
   .contrib-time-line { font-size: 12px; color: var(--text-secondary); }
   .admin-list-wrap { margin-top: 12px; border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .admin-list-table { margin-top: 0; table-layout: fixed; }
+  .admin-list-table { margin-top: 0; table-layout: fixed; width: 100%; }
   .admin-list-table th {
-    text-align: center; background: var(--bg); font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
+    background: var(--bg); font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
     padding: 9px 10px; border-bottom: 0.5px solid var(--border-strong);
   }
-  .admin-list-table th.col-name, .admin-list-table td.col-name { text-align: left; }
-  .admin-list-table td { text-align: center; padding: 7px 10px; vertical-align: middle; }
+  .admin-list-table td { padding: 7px 10px; vertical-align: middle; }
   .admin-list-table tr:hover td { background: var(--hover, #fafaf8); }
   .admin-list-table tr.row-former td { color: var(--text-muted); background: #fafaf8; }
   .admin-edit-input {
@@ -322,14 +321,42 @@
   table.agg tr:last-child td { border-bottom: none; }
   table.agg tr.done td { color: var(--text-muted); background: #fafaf8; }
 
+  /* 관리자 영역 표: 제목/값 모두 가운데 정렬 (table.agg th left 규칙보다 우선) */
+  .admin-page-section table.agg th,
+  .admin-page-section table.agg td,
+  table.agg.admin-list-table th,
+  table.agg.admin-list-table td,
+  .team-full-table-wrap table.agg th,
+  .team-full-table-wrap table.agg td {
+    text-align: center;
+    vertical-align: middle;
+  }
+  .admin-page-section table.agg th,
+  table.agg.admin-list-table th,
+  .team-full-table-wrap table.agg th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg);
+  }
+  .admin-list-table .edit-row-btn,
+  .admin-list-table .del-row-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+  }
+
   /* KPI(디자인/영상 매출) 전체 리스트 테이블: 통합관리 화면과 톤을 맞춰 가독성을 높인다 */
   .team-full-table-wrap { border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
   .team-full-table-wrap table.team-full-table { margin: 0; font-size: 12px; }
   .team-full-table-wrap table.team-full-table th {
     background: var(--bg); font-size: 11px; font-weight: 600; color: var(--text-secondary);
     padding: 10px 9px; border-bottom: 0.5px solid var(--border-strong); white-space: nowrap;
+    text-align: center;
   }
-  .team-full-table-wrap table.team-full-table td { padding: 8px 9px; vertical-align: middle; }
+  .team-full-table-wrap table.team-full-table td {
+    padding: 8px 9px; vertical-align: middle; text-align: center;
+  }
   .team-full-table-wrap table.team-full-table tr:hover td { background: var(--hover, #fafaf8); }
   .team-full-table-wrap table.team-full-table tr.done td { background: #fafaf8; }
   .kpi-section-title { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 12px; padding: 0 2px; }

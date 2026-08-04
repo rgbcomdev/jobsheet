@@ -9,7 +9,8 @@ import {
 } from "@/lib/aggregate";
 
 export function DashboardView() {
-  const { loading, activeEmployeesByTeam, data, source } = useJobsheet();
+  const { loading, loadError, activeEmployeesByTeam, data, source, refresh } =
+    useJobsheet();
 
   if (loading) {
     return (
@@ -17,6 +18,18 @@ export function DashboardView() {
         <p style={{ textAlign: "center", color: "var(--text-muted)" }}>
           불러오는 중…
         </p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="wrap" style={{ textAlign: "center", paddingTop: 80 }}>
+        <p style={{ color: "var(--danger)" }}>데이터를 불러오지 못했습니다.</p>
+        <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{loadError}</p>
+        <button type="button" className="backup-btn" onClick={() => refresh()}>
+          다시 시도
+        </button>
       </div>
     );
   }

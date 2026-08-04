@@ -36,17 +36,21 @@ export async function loadSeedFromPublic(): Promise<JobsheetSeed> {
   return res.json();
 }
 
-async function fetchAll(
+/** 페이지네이션 (id 있는 테이블). 무한루프 방지용 maxPages 포함. */
+async function fetchAllById(
   supabase: SupabaseClient,
   table: string,
   pageSize = 1000
 ) {
   const rows: Record<string, unknown>[] = [];
-  for (let from = 0; ; from += pageSize) {
+  const maxPages = 50;
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * pageSize;
     const to = from + pageSize - 1;
     const { data, error } = await supabase
       .from(table)
       .select("*")
+      .order("id", { ascending: true })
       .range(from, to);
     if (error) throw error;
     if (!data?.length) break;
@@ -56,12 +60,38 @@ async function fetchAll(
   return rows;
 }
 
+/** 행 수가 적은 테이블 — 한 번에 조회 */
+async function fetchOnce(supabase: SupabaseClient, table: string) {
+  const { data, error } = await supabase.from(table).select("*");
+  if (error) throw error;
+  return (data || []) as Record<string, unknown>[];
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string) {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
 export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
 
-  const employees = await fetchAll(supabase, "employees");
-  if (!employees.length) return null; // not seeded yet
+  const employees = await fetchOnce(supabase, "employees");
+  if (!employees.length) return null;
 
   const [
     companies,
@@ -75,16 +105,16 @@ export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
     personEstimates,
     overrides,
   ] = await Promise.all([
-    fetchAll(supabase, "companies"),
-    fetchAll(supabase, "entries"),
-    fetchAll(supabase, "project_statuses"),
-    fetchAll(supabase, "leaves"),
-    fetchAll(supabase, "public_duties"),
-    fetchAll(supabase, "holidays"),
-    fetchAll(supabase, "grade_rates"),
-    fetchAll(supabase, "estimates"),
-    fetchAll(supabase, "person_estimates"),
-    fetchAll(supabase, "task_item_overrides"),
+    fetchOnce(supabase, "companies"),
+    fetchAllById(supabase, "entries"),
+    fetchOnce(supabase, "project_statuses"),
+    fetchOnce(supabase, "leaves"),
+    fetchOnce(supabase, "public_duties"),
+    fetchOnce(supabase, "holidays"),
+    fetchOnce(supabase, "grade_rates"),
+    fetchOnce(supabase, "estimates"),
+    fetchOnce(supabase, "person_estimates"),
+    fetchOnce(supabase, "task_item_overrides"),
   ]);
 
   const seed = emptySeed();
@@ -165,7 +195,11 @@ export async function loadJobsheetData(): Promise<{
 }> {
   if (isSupabaseConfigured()) {
     try {
-      const remote = await loadFromSupabase();
+      const remote = await withTimeout(
+        loadFromSupabase(),
+        20000,
+        "Supabase load"
+      );
       if (remote) return { data: remote, source: "supabase" };
     } catch (e) {
       console.warn("Supabase load failed, falling back to local seed", e);

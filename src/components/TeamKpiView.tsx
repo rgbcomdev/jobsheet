@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useJobsheet } from "@/context/JobsheetContext";
-import { buildGroups } from "@/lib/aggregate";
+import { buildGroups, deriveMajorSub } from "@/lib/aggregate";
 import { classifyDesignOrPublish, computeDuration, round1 } from "@/lib/time";
 import { STAGES } from "@/lib/constants";
 import { fmWon } from "@/lib/estimate";
+
+type TeamTab = "전체" | "디자인" | "동영상";
 
 export function TeamKpiView() {
   const { loading, data, getStatus, setStatus } = useJobsheet();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
-  const [tab, setTab] = useState<"디자인" | "동영상">("디자인");
+  const [tab, setTab] = useState<TeamTab>("전체");
 
   const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
 
@@ -33,16 +35,56 @@ export function TeamKpiView() {
     return Object.keys(groups)
       .filter((k) => {
         const g = groups[k];
-        const major =
-          g.major ||
-          data.companyCat[g.company]?.major ||
-          (["모션영상", "3D영상", "촬영영상"].includes(g.project)
-            ? "동영상"
-            : "디자인");
+        const { major } = deriveMajorSub(
+          g.project,
+          g.company,
+          data.companyCat,
+          data.projectTypesByMajor
+        );
+        if (tab === "전체") return true;
+        // 원본과 동일: RGB내부업무는 팀 구분 없이 각 팀 탭에도 포함
+        if (g.project === "RGB내부업무") return true;
         return major === tab;
       })
-      .sort((a, b) => groups[b].total - groups[a].total);
-  }, [groups, tab, data.companyCat]);
+      .sort((a, b) => {
+        const ga = groups[a];
+        const gb = groups[b];
+        const ma = deriveMajorSub(
+          ga.project,
+          ga.company,
+          data.companyCat,
+          data.projectTypesByMajor
+        ).major;
+        const mb = deriveMajorSub(
+          gb.project,
+          gb.company,
+          data.companyCat,
+          data.projectTypesByMajor
+        ).major;
+        if (tab === "전체" && ma !== mb) {
+          return ma === "디자인" ? -1 : 1;
+        }
+        return gb.total - ga.total;
+      });
+  }, [groups, tab, data.companyCat, data.projectTypesByMajor]);
+
+  const counts = useMemo(() => {
+    let all = 0;
+    let design = 0;
+    let video = 0;
+    Object.values(groups).forEach((g) => {
+      all++;
+      const { major } = deriveMajorSub(
+        g.project,
+        g.company,
+        data.companyCat,
+        data.projectTypesByMajor
+      );
+      if (g.project === "RGB내부업무" || major === "디자인") design++;
+      if (g.project === "RGB내부업무" || major === "동영상") video++;
+    });
+    return { all, design, video };
+  }, [groups, data.companyCat, data.projectTypesByMajor]);
 
   if (loading) {
     return (
@@ -67,6 +109,12 @@ export function TeamKpiView() {
     setYear(y);
   };
 
+  const tabs: { key: TeamTab; label: string; count: number }[] = [
+    { key: "전체", label: "전체", count: counts.all },
+    { key: "디자인", label: "디자인팀", count: counts.design },
+    { key: "동영상", label: "영상팀", count: counts.video },
+  ];
+
   return (
     <div className="wrap">
       <div className="dash-head">
@@ -88,20 +136,19 @@ export function TeamKpiView() {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button
-          type="button"
-          className={"team-tab-btn" + (tab === "디자인" ? " active" : "")}
-          onClick={() => setTab("디자인")}
-        >
-          디자인팀
-        </button>
-        <button
-          type="button"
-          className={"team-tab-btn" + (tab === "동영상" ? " active" : "")}
-          onClick={() => setTab("동영상")}
-        >
-          영상팀
-        </button>
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={"team-tab-btn" + (tab === t.key ? " active" : "")}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            <span style={{ marginLeft: 6, opacity: 0.7, fontWeight: 500 }}>
+              {t.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       <div className="team-full-table-wrap">
@@ -109,6 +156,7 @@ export function TeamKpiView() {
           <thead>
             <tr>
               <th>업체</th>
+              <th>대분류</th>
               <th>카테고리</th>
               <th>역할</th>
               <th>담당</th>
@@ -123,12 +171,36 @@ export function TeamKpiView() {
             </tr>
           </thead>
           <tbody>
+            {filteredKeys.length === 0 && (
+              <tr>
+                <td
+                  colSpan={11}
+                  style={{
+                    textAlign: "center",
+                    color: "var(--text-muted)",
+                    padding: 24,
+                  }}
+                >
+                  해당 조건의 프로젝트가 없습니다.
+                </td>
+              </tr>
+            )}
             {filteredKeys.map((key) => {
               const g = groups[key];
+              const catInfo = deriveMajorSub(
+                g.project,
+                g.company,
+                data.companyCat,
+                data.projectTypesByMajor
+              );
               const done = getStatus(g.company, g.project) === "완료";
               const byRole: Record<
                 string,
-                { hours: number; owners: Set<string>; stages: Record<string, number> }
+                {
+                  hours: number;
+                  owners: Set<string>;
+                  stages: Record<string, number>;
+                }
               > = {
                 디자인: {
                   hours: 0,
@@ -172,15 +244,16 @@ export function TeamKpiView() {
                   {idx === 0 && (
                     <>
                       <td rowSpan={roles.length}>{g.company}</td>
+                      <td rowSpan={roles.length} className="center">
+                        {catInfo.major === "동영상" ? "영상" : catInfo.major}
+                      </td>
                       <td rowSpan={roles.length}>{g.project}</td>
                     </>
                   )}
                   <td>
                     <span className={`role-badge role-${role}`}>{role}</span>
                   </td>
-                  <td>
-                    {[...byRole[role].owners].join(", ") || "-"}
-                  </td>
+                  <td>{[...byRole[role].owners].join(", ") || "-"}</td>
                   {STAGES.map((s) => (
                     <td className="center mono" key={s}>
                       {byRole[role].stages[s]
