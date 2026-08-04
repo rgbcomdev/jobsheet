@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { WorkEntry } from "@/lib/types";
 import { useJobsheet } from "@/context/JobsheetContext";
 import {
+  DEFAULT_PROJECT_TYPES_BY_MAJOR,
   LEAVE_TYPES,
+  MAJORS,
   STAGE_BADGE_TEXT,
   STAGES,
   WEEKDAYS_KO,
@@ -46,6 +48,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
         project: "",
         note: "",
         stage: "본작업",
+        major: "디자인",
       },
       {
         date,
@@ -56,6 +59,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
         project: "",
         note: "",
         stage: "본작업",
+        major: "디자인",
       },
     ] as WorkEntry[];
   }, [data.entries, date, owner, open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -89,6 +93,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
       project: "",
       note: "",
       stage: "본작업",
+      major: "디자인",
     },
     {
       date,
@@ -99,6 +104,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
       project: "",
       note: "",
       stage: "본작업",
+      major: "디자인",
     },
   ];
 
@@ -327,10 +333,31 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     }, 500);
   };
 
-  const projectTypes = data.projectTypesByMajor || {};
-  const allProjects = Array.from(
-    new Set(Object.values(projectTypes).flat().concat(["RGB내부업무"]))
-  );
+  const projectTypes =
+    Object.keys(data.projectTypesByMajor || {}).length > 0
+      ? data.projectTypesByMajor
+      : DEFAULT_PROJECT_TYPES_BY_MAJOR;
+
+  const normalizeMajor = (major?: string) => {
+    if (major === "영상") return "동영상";
+    if (major === "동영상" || major === "디자인") return major;
+    return "";
+  };
+
+  const resolveMajor = (entry: WorkEntry) => {
+    const fromEntry = normalizeMajor(entry.major);
+    if (fromEntry) return fromEntry;
+    for (const mj of MAJORS) {
+      if ((projectTypes[mj] || []).includes(entry.project)) return mj;
+    }
+    const fromCompany = normalizeMajor(
+      data.companyCat[entry.company]?.major
+    );
+    return fromCompany || "디자인";
+  };
+
+  const projectsForMajor = (major: string) =>
+    projectTypes[major] || DEFAULT_PROJECT_TYPES_BY_MAJOR[major] || [];
 
   return (
     <div className="overlay open" onClick={onClose}>
@@ -414,6 +441,8 @@ export function DayModal({ owner, date, open, onClose }: Props) {
             const leave = leaveType;
             const dur = computeDuration(e.start, e.end, leave);
             const ot = computeOvertime(e.start, e.end);
+            const major = resolveMajor(e);
+            const projectOptions = projectsForMajor(major);
             const done =
               e.company && e.project
                 ? getStatus(e.company, e.project) === "완료"
@@ -450,30 +479,70 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                   <input
                     className="company"
                     list="companyList"
-                    placeholder="업체"
+                    placeholder="업체명"
                     value={e.company}
                     onChange={(ev) => {
                       const company = ev.target.value;
-                      const info = data.companyCat[company];
-                      updateRow(i, {
-                        company,
-                        project: info?.cat || e.project,
-                        major: info?.major,
-                      });
+                      const info = data.companyCat[company.trim()];
+                      if (info) {
+                        const nextMajor =
+                          normalizeMajor(info.major) || "디자인";
+                        const list = projectsForMajor(nextMajor);
+                        const project =
+                          info.cat && list.includes(info.cat) ? info.cat : "";
+                        updateRow(i, {
+                          company,
+                          major: nextMajor,
+                          project,
+                        });
+                      } else {
+                        updateRow(i, { company });
+                      }
                     }}
                   />
                   <select
-                    className="project-select"
-                    value={e.project}
-                    onChange={(ev) => updateRow(i, { project: ev.target.value })}
+                    className="major-select"
+                    value={major}
+                    onChange={(ev) =>
+                      updateRow(i, {
+                        major: ev.target.value,
+                        project: "",
+                      })
+                    }
                   >
-                    <option value="">카테고리</option>
-                    {allProjects.map((p) => (
+                    {MAJORS.map((mj) => (
+                      <option key={mj} value={mj}>
+                        {mj}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="project-select"
+                    value={
+                      projectOptions.includes(e.project) ? e.project : ""
+                    }
+                    onChange={(ev) =>
+                      updateRow(i, { project: ev.target.value })
+                    }
+                  >
+                    <option value="" disabled>
+                      세부항목 선택
+                    </option>
+                    {projectOptions.map((p) => (
                       <option key={p} value={p}>
                         {p}
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="me-row2b">
+                  <input
+                    placeholder="작업항목 (예: 메인 배너 시안 작업)"
+                    value={e.note}
+                    onChange={(ev) => updateRow(i, { note: ev.target.value })}
+                  />
+                </div>
+                <div className="me-row3">
                   <select
                     className="me-select"
                     value={e.stage}
@@ -485,15 +554,6 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="me-row2b">
-                  <input
-                    placeholder="작업내용"
-                    value={e.note}
-                    onChange={(ev) => updateRow(i, { note: ev.target.value })}
-                  />
-                </div>
-                <div className="me-row3">
                   <button
                     type="button"
                     className={"me-complete-btn" + (done ? " done" : "")}
@@ -533,11 +593,12 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                 project: "",
                 note: "",
                 stage: "본작업",
+                major: "디자인",
               },
             ])
           }
         >
-          + 항목 추가
+          + 시간대 추가
         </button>
 
         <div className="modal-footer">

@@ -207,10 +207,15 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
           const company = (e.company || "").trim();
           if (!company || company === "RGB내부") return;
           let info = companyCat[company];
+          const major =
+            e.major === "영상" ? "동영상" : e.major || info?.major || "디자인";
           if (!info) {
-            info = { major: e.major || "디자인", cat: e.project || "" };
+            info = { major, cat: e.project || "" };
             companyCat[company] = info;
             if (!companyMaster.includes(company)) companyMaster.push(company);
+          } else {
+            if (major) info.major = major;
+            if (e.project) info.cat = e.project;
           }
           if (!info.assignee) info.assignee = owner;
         });
@@ -238,6 +243,33 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
             note: e.note || "",
           }));
         if (rows.length) await sb.from("entries").insert(rows);
+
+        const companyUpdates = new Map<
+          string,
+          { major: string; category: string; assignee: string }
+        >();
+        dayEntries.forEach((e) => {
+          const company = (e.company || "").trim();
+          if (!company || company === "RGB내부") return;
+          const major =
+            e.major === "영상" ? "동영상" : e.major || "디자인";
+          companyUpdates.set(company, {
+            major,
+            category: e.project || "",
+            assignee: owner,
+          });
+        });
+        for (const [name, info] of companyUpdates) {
+          await sb.from("companies").upsert(
+            {
+              name,
+              major: info.major,
+              category: info.category || null,
+              assignee: info.assignee,
+            },
+            { onConflict: "name" }
+          );
+        }
       }
     },
     []
