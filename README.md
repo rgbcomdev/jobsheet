@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RGB 업무일지 (Next.js + Supabase)
 
-## Getting Started
+기존 단일 HTML(`legacy/업무일지_시스템_v11.html`)을 Next.js App Router로 이전한 버전입니다.
 
-First, run the development server:
+## 기능
+- 대시보드 / 개인 월간 캘린더·일지
+- 통합관리 (직원·업체)
+- 팀 KPI / 견적·작업시간 분석
+- 엑셀·JSON 백업
+- Supabase Postgres 연동 (미설정 시 `public/data/seed.json` 로컬 시드 사용)
+
+## 로컬 실행
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase 설정
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Supabase 프로젝트 생성
+2. SQL Editor에서 [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) 실행
+3. `.env.local` 작성:
 
-## Learn More
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
 
-To learn more about Next.js, take a look at the following resources:
+4. 시드 적재:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run extract-data   # HTML → data/seed.json (이미 생성됨)
+npm run seed           # seed.json → Supabase
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. 시드 후 앱을 새로고침하면 `source=supabase`로 로드됩니다.
 
-## Deploy on Vercel
+> 현재 RLS는 **anon CRUD 전체 허용**(공개 운영). 추후 관리자 Auth 추가 시 정책을 읽기 공개 / 쓰기 authenticated로 교체하세요.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Vercel 배포
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. GitHub에 푸시 후 [Vercel](https://vercel.com)에서 Import
+2. Environment Variables에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` 등록
+3. Deploy
+4. (최초 1회) 로컬에서 `npm run seed`로 DB 시드
+
+## 스크립트
+
+| 명령 | 설명 |
+|------|------|
+| `npm run extract-data` | legacy HTML에서 seed.json 추출 |
+| `npm run seed` | Supabase에 시드 업로드 |
+
+## 보안 안내
+로그인 없이 공개 모드입니다. URL을 아는 누구나 데이터를 수정할 수 있습니다. 사내 공유 용도로만 사용하고, 관리자 계정이 준비되면 Auth + RLS를 강화하세요.

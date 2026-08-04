@@ -1,0 +1,139 @@
+import * as XLSX from "xlsx";
+import type { WorkEntry } from "./types";
+import {
+  computeDuration,
+  computeOvertime,
+  hoursToTimeValue,
+  pad,
+  round1,
+} from "./time";
+import { STAGE_TO_SUMMARY_ROW } from "./constants";
+
+export function exportMonthlyExcel(
+  owner: string,
+  year: number,
+  month: number,
+  entries: WorkEntry[],
+  leaveData: Record<string, string>,
+  holidays: Record<string, string>
+) {
+  const monthPrefix = `${year}-${pad(month)}`;
+  const dayEntries: Record<string, WorkEntry[]> = {};
+  entries.forEach((e) => {
+    if ((e.owner || "") !== owner) return;
+    if (!e.date.startsWith(monthPrefix)) return;
+    if (!dayEntries[e.date]) dayEntries[e.date] = [];
+    dayEntries[e.date].push(e);
+  });
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const allDates: string[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(year, month - 1, d);
+    const dow = dt.getDay();
+    const dateStr = `${year}-${pad(month)}-${pad(d)}`;
+    if (dow === 0 || dow === 6) {
+      if (!dayEntries[dateStr] || dayEntries[dateStr].length === 0) continue;
+    }
+    allDates.push(dateStr);
+  }
+  const weeks: string[][] = [];
+  for (let i = 0; i < allDates.length; i += 5) weeks.push(allDates.slice(i, i + 5));
+
+  const aoa: (string | number)[][] = [];
+  aoa.push([`${owner} ${year}년 ${month}월 업무일지`]);
+  aoa.push([]);
+
+  weeks.forEach((week, wi) => {
+    aoa.push([`주 ${wi + 1}`]);
+    const header = ["구분", ...week.map((d) => {
+      const day = Number(d.slice(-2));
+      const holiday = holidays[d] || "";
+      const leave = leaveData[`${owner}|||${d}`] || "";
+      return `${month}/${day}${holiday ? ` ${holiday}` : ""}${leave ? ` ${leave}` : ""}`;
+    })];
+    aoa.push(header);
+
+    const summaryRows = ["기획", "시안", "본작업", "수정"];
+    summaryRows.forEach((label) => {
+      const row: (string | number)[] = [label];
+      week.forEach((dateStr) => {
+        const list = dayEntries[dateStr] || [];
+        let hours = 0;
+        list.forEach((e) => {
+          const mapped = STAGE_TO_SUMMARY_ROW[e.stage] || e.stage;
+          if (mapped === label) {
+            const leave = leaveData[`${owner}|||${dateStr}`] || "";
+            hours += computeDuration(e.start, e.end, leave);
+          }
+        });
+        row.push(hours > 0 ? hoursToTimeValue(hours) : "");
+      });
+      aoa.push(row);
+    });
+
+    const detailRow: (string | number)[] = ["작업내용"];
+    week.forEach((dateStr) => {
+      const list = dayEntries[dateStr] || [];
+      detailRow.push(
+        list
+          .map((e) => `${e.start}-${e.end} ${e.company} ${e.note || ""}`.trim())
+          .join("\n")
+      );
+    });
+    aoa.push(detailRow);
+
+    const totalRow: (string | number)[] = ["합계"];
+    let weekOt = 0;
+    week.forEach((dateStr) => {
+      const list = dayEntries[dateStr] || [];
+      let hours = 0;
+      list.forEach((e) => {
+        const leave = leaveData[`${owner}|||${dateStr}`] || "";
+        hours += computeDuration(e.start, e.end, leave);
+        weekOt += computeOvertime(e.start, e.end);
+      });
+      totalRow.push(hours > 0 ? hoursToTimeValue(hours) : "");
+    });
+    aoa.push(totalRow);
+    aoa.push(["연장", round1(weekOt)]);
+    aoa.push([]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `${month}월`);
+  XLSX.writeFile(wb, `${owner}_${year}년_${month}월_업무일지.xlsx`);
+}
+
+export function exportProjectsExcel(
+  owner: string,
+  statusFilter: string,
+  rows: {
+    company: string;
+    project: string;
+    stages: Record<string, number>;
+    total: number;
+    status: string;
+  }[]
+) {
+  const aoa: (string | number)[][] = [
+    ["업체명", "카테고리", "시안", "본작업", "수정중", "제작중", "합계", "상태"],
+  ];
+  rows.forEach((r) => {
+    aoa.push([
+      r.company,
+      r.project,
+      r.stages["시안"] || 0,
+      r.stages["본작업"] || 0,
+      r.stages["수정중"] || 0,
+      r.stages["제작중"] || 0,
+      r.total,
+      r.status,
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "프로젝트");
+  XLSX.writeFile(wb, `${owner}_전체프로젝트_${statusFilter}.xlsx`);
+}
