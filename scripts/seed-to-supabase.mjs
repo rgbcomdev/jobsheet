@@ -29,10 +29,11 @@ const seed = JSON.parse(
   fs.readFileSync(path.join(root, "data", "seed.json"), "utf8")
 );
 
-async function upsertBatch(table, rows, chunk = 500) {
+async function upsertBatch(table, rows, chunk = 500, onConflict) {
   for (let i = 0; i < rows.length; i += chunk) {
     const part = rows.slice(i, i + chunk);
-    const { error } = await supabase.from(table).upsert(part);
+    const opts = onConflict ? { onConflict } : undefined;
+    const { error } = await supabase.from(table).upsert(part, opts);
     if (error) throw new Error(`${table}: ${error.message}`);
     console.log(`${table}: ${Math.min(i + chunk, rows.length)}/${rows.length}`);
   }
@@ -53,7 +54,7 @@ async function main() {
       });
     });
   });
-  await upsertBatch("employees", employees);
+  await upsertBatch("employees", employees, 500, "name");
 
   const companies = (seed.companyMaster || [])
     .filter(Boolean)
@@ -68,7 +69,7 @@ async function main() {
         assignee: info.assignee || null,
       };
     });
-  await upsertBatch("companies", companies);
+  await upsertBatch("companies", companies, 500, "name");
 
   const entries = (seed.entries || []).map((e) => ({
     date: e.date,
