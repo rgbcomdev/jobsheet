@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useJobsheet } from "@/context/JobsheetContext";
 import {
   LEAVE_LABEL_SHORT,
@@ -22,6 +22,7 @@ import { DayModal } from "./DayModal";
 
 export function IndividualView({ name }: { name: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     loading,
     data,
@@ -38,6 +39,7 @@ export function IndividualView({ name }: { name: string }) {
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [monthSynced, setMonthSynced] = useState(false);
   const [modalDate, setModalDate] = useState<string | null>(null);
+  const [flashDate, setFlashDate] = useState<string | null>(null);
 
   useEffect(() => {
     setMonthSynced(false);
@@ -45,11 +47,21 @@ export function IndividualView({ name }: { name: string }) {
 
   useEffect(() => {
     if (loading || monthSynced) return;
+    const dateParam = searchParams.get("date");
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const [y, m] = dateParam.split("-").map(Number);
+      setYear(y);
+      setMonth(m);
+      setFlashDate(dateParam);
+      setMonthSynced(true);
+      const t = window.setTimeout(() => setFlashDate(null), 1800);
+      return () => window.clearTimeout(t);
+    }
     const { year: y, month: m } = getDefaultYearMonth(data.entries, name);
     setYear(y);
     setMonth(m);
     setMonthSynced(true);
-  }, [loading, data.entries, name, monthSynced]);
+  }, [loading, data.entries, name, monthSynced, searchParams]);
 
   const monthPrefix = `${year}-${pad(month)}`;
 
@@ -133,7 +145,8 @@ export function IndividualView({ name }: { name: string }) {
             (dow === 0 || dow === 6 ? " weekend" : "") +
             (holidayName ? " holiday" : "") +
             (leaveType ? " has-leave" : "") +
-            (publicDutyType ? " has-public-duty" : "")
+            (publicDutyType ? " has-public-duty" : "") +
+            (flashDate === dateStr ? " flash-jump" : "")
           }
           onClick={() => setModalDate(dateStr)}
         >
@@ -194,9 +207,9 @@ export function IndividualView({ name }: { name: string }) {
     getLeave,
     getPublicDuty,
     getStatus,
+    flashDate,
+    data.taskItemOverrides,
   ]);
-
-  // Fix require usage - import at top instead. Let me rewrite calendar cells cleanly in a fix.
 
   if (loading) {
     return (

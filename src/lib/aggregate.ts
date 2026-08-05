@@ -1,6 +1,6 @@
-import { TASK_STAGE_SUFFIX, DEFAULT_PROJECT_TYPES_BY_MAJOR, MAJORS } from "./constants";
+import { TASK_STAGE_SUFFIX, DEFAULT_PROJECT_TYPES_BY_MAJOR, MAJORS, STAGE_RANK } from "./constants";
 import type { CompanyInfo, WorkEntry } from "./types";
-import { computeDuration, computeOvertime, pad, round1 } from "./time";
+import { classifyDesignOrPublish, computeDuration, computeOvertime, pad, round1 } from "./time";
 
 export function summarizeNoteForCell(note: string, company: string) {
   if (!note) return "";
@@ -56,6 +56,7 @@ export type AggGroup = {
   total: number;
   notes: string[];
   owners: Set<string>;
+  lastDate: string;
 };
 
 export function buildGroups(
@@ -82,6 +83,7 @@ export function buildGroups(
         total: 0,
         notes: [],
         owners: new Set(),
+        lastDate: "",
       };
     }
     const g = groups[key];
@@ -91,6 +93,7 @@ export function buildGroups(
     g.total += dur;
     g.owners.add(e.owner);
     if (e.note) g.notes.push(e.note);
+    if (e.date >= g.lastDate) g.lastDate = e.date;
   });
   Object.values(groups).forEach((g) => {
     g.total = round1(g.total);
@@ -99,6 +102,90 @@ export function buildGroups(
     });
   });
   return groups;
+}
+
+export type TaskStageRow = {
+  task: string;
+  stage: string;
+  hours: Record<string, number>;
+  total: number;
+  lastDate: string;
+};
+
+/** 전체 프로젝트: 작업항목+단계별 시간 분해 */
+export function buildTaskStageBreakdown(
+  entries: WorkEntry[],
+  owner: string,
+  company: string,
+  project: string,
+  leaveData: Record<string, string>,
+  overrides: Record<string, string>,
+  staffRole: Record<string, string>,
+  roleFilter?: "디자인" | "퍼블" | null
+): TaskStageRow[] {
+  const rows: Record<
+    string,
+    {
+      task: string;
+      stage: string;
+      hours: Record<string, number>;
+      lastDate: string;
+    }
+  > = {};
+
+  entries.forEach((e) => {
+    if ((e.owner || "") !== owner) return;
+    if (e.company !== company || e.project !== project) return;
+    const leave = leaveData[`${owner}|||${e.date}`] || "";
+    const dur = computeDuration(e.start, e.end, leave);
+    if (roleFilter) {
+      const role = classifyDesignOrPublish(
+        owner,
+        e.note,
+        e.stage,
+        staffRole
+      );
+      if (role !== roleFilter) return;
+    }
+    const task =
+      summarizeTaskItem(e.note, company, owner, project, overrides) || "-";
+    const stage = e.stage || "본작업";
+    const key = `${task}|||${stage}`;
+    if (!rows[key]) {
+      rows[key] = {
+        task,
+        stage,
+        hours: { 시안: 0, 본작업: 0, 수정중: 0, 제작중: 0 },
+        lastDate: "",
+      };
+    }
+    if (rows[key].hours[stage] != null) rows[key].hours[stage] += dur;
+    if (e.date >= rows[key].lastDate) rows[key].lastDate = e.date;
+  });
+
+  const list = Object.values(rows).map((r) => ({
+    ...r,
+    hours: {
+      시안: round1(r.hours["시안"]),
+      본작업: round1(r.hours["본작업"]),
+      수정중: round1(r.hours["수정중"]),
+      제작중: round1(r.hours["제작중"]),
+    },
+    total: round1(
+      r.hours["시안"] +
+        r.hours["본작업"] +
+        r.hours["수정중"] +
+        r.hours["제작중"]
+    ),
+  }));
+
+  list.sort((a, b) => {
+    const ra = STAGE_RANK[a.stage] || 0;
+    const rb = STAGE_RANK[b.stage] || 0;
+    if (ra !== rb) return ra - rb;
+    return a.lastDate.localeCompare(b.lastDate);
+  });
+  return list;
 }
 
 export function monthHoursFor(

@@ -6,6 +6,8 @@ import { useJobsheet } from "@/context/JobsheetContext";
 import { MAJORS, DEFAULT_PROJECT_TYPES_BY_MAJOR } from "@/lib/constants";
 import { buildBackupPayload, downloadBackup, parseBackupFile } from "@/lib/backup";
 
+const TEAM_ORDER = ["디자인", "영상"] as const;
+
 export function AdminView() {
   const {
     loading,
@@ -13,6 +15,7 @@ export function AdminView() {
     upsertEmployee,
     deleteEmployee,
     upsertCompany,
+    reorderEmployees,
     replaceFromBackup,
   } = useJobsheet();
 
@@ -26,6 +29,9 @@ export function AdminView() {
     grade: "사원",
     isFormer: false,
   });
+  const [dragName, setDragName] = useState<string | null>(null);
+  const [dragTeam, setDragTeam] = useState<string | null>(null);
+  const [dragOverName, setDragOverName] = useState<string | null>(null);
 
   const [regCompany, setRegCompany] = useState("");
   const [regMajor, setRegMajor] = useState("디자인");
@@ -33,27 +39,64 @@ export function AdminView() {
   const [regTask, setRegTask] = useState("");
   const [regStartMonth, setRegStartMonth] = useState("");
 
-  const employeeRows = useMemo(() => {
-    const rows: {
-      name: string;
-      team: string;
-      grade: string;
-      isFormer: boolean;
-    }[] = [];
-    Object.entries(data.employees).forEach(([team, names]) => {
-      names.forEach((name) => {
-        const isFormer = data.formerEmployees.includes(name);
-        if (!showFormer && isFormer) return;
-        rows.push({
+  const employeesByTeam = useMemo(() => {
+    const out: Record<
+      string,
+      { name: string; team: string; grade: string; isFormer: boolean }[]
+    > = {};
+    for (const team of TEAM_ORDER) {
+      const names = data.employees[team] || [];
+      out[team] = names
+        .filter((name) => {
+          const isFormer = data.formerEmployees.includes(name);
+          return showFormer || !isFormer;
+        })
+        .map((name) => ({
           name,
           team,
           grade: data.staffGrade[name] || "사원",
-          isFormer,
-        });
-      });
+          isFormer: data.formerEmployees.includes(name),
+        }));
+    }
+    // 기타 팀
+    Object.entries(data.employees).forEach(([team, names]) => {
+      if ((TEAM_ORDER as readonly string[]).includes(team)) return;
+      out[team] = names
+        .filter((name) => {
+          const isFormer = data.formerEmployees.includes(name);
+          return showFormer || !isFormer;
+        })
+        .map((name) => ({
+          name,
+          team,
+          grade: data.staffGrade[name] || "사원",
+          isFormer: data.formerEmployees.includes(name),
+        }));
     });
-    return rows;
+    return out;
   }, [data.employees, data.staffGrade, data.formerEmployees, showFormer]);
+
+  const employeeCount = useMemo(
+    () => Object.values(employeesByTeam).reduce((n, rows) => n + rows.length, 0),
+    [employeesByTeam]
+  );
+
+  const moveEmployee = async (
+    team: string,
+    fromName: string,
+    toName: string
+  ) => {
+    if (fromName === toName) return;
+    const rows = employeesByTeam[team] || [];
+    const names = rows.map((r) => r.name);
+    const fromIdx = names.indexOf(fromName);
+    const toIdx = names.indexOf(toName);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = [...names];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    await reorderEmployees(team, next);
+  };
 
   const projectOptions =
     data.projectTypesByMajor?.[regMajor] ||
@@ -153,7 +196,7 @@ export function AdminView() {
         <h4>
           직원 관리{" "}
           <span className="admin-count-pill">
-            <span>{employeeRows.length}</span>명
+            <span>{employeeCount}</span>명
           </span>
         </h4>
         <p className="admin-sub">+ 신규 직원 등록</p>
@@ -193,69 +236,123 @@ export function AdminView() {
             퇴사자 보기
           </button>
         </div>
-        <div className="admin-list-wrap">
-          <table className="agg admin-list-table">
-            <thead>
-              <tr>
-                <th>이름</th>
-                <th>팀</th>
-                <th>직급</th>
-                <th>KPI</th>
-                <th>수정</th>
-                <th>삭제</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employeeRows.map((r) => (
-                <tr key={r.name} className={r.isFormer ? "row-former" : ""}>
-                  <td>{r.name}</td>
-                  <td>{r.team}팀</td>
-                  <td>{r.grade}</td>
-                  <td>
-                    <Link
-                      href={`/e/${encodeURIComponent(r.name)}`}
-                      className="edit-row-btn"
-                    >
-                      KPI 보기
-                    </Link>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="edit-row-btn"
-                      onClick={() => {
-                        setEditName(r.name);
-                        setEditForm({
-                          name: r.name,
-                          team: r.team,
-                          grade: r.grade,
-                          isFormer: r.isFormer,
-                        });
-                      }}
-                    >
-                      수정
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="del-row-btn"
-                      onClick={async () => {
-                        if (confirm(`${r.name} 직원을 삭제할까요?`)) {
-                          await deleteEmployee(r.name);
+        <p className="admin-sub" style={{ marginTop: 12 }}>
+          ⋮⋮ 핸들을 드래그해 팀 내 순서를 바꿀 수 있습니다. (대시보드 카드
+          순서에 반영)
+        </p>
+        {Object.entries(employeesByTeam).map(([team, rows]) => {
+          if (!rows.length) return null;
+          return (
+            <div key={team} className="admin-team-block">
+              <h5 className="admin-team-title">{team}팀</h5>
+              <div className="admin-list-wrap">
+                <table className="agg admin-list-table">
+                  <thead>
+                    <tr>
+                      <th className="col-drag" aria-label="순서" />
+                      <th>이름</th>
+                      <th>직급</th>
+                      <th>KPI</th>
+                      <th>수정</th>
+                      <th>삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr
+                        key={r.name}
+                        className={
+                          (r.isFormer ? "row-former " : "") +
+                          (dragName === r.name ? "is-dragging " : "") +
+                          (dragOverName === r.name ? "drag-over " : "")
                         }
-                      }}
-                    >
-                      삭제
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        onDragOver={(e) => {
+                          if (dragTeam !== team) return;
+                          e.preventDefault();
+                          setDragOverName(r.name);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverName === r.name) setDragOverName(null);
+                        }}
+                        onDrop={async (e) => {
+                          e.preventDefault();
+                          if (dragTeam !== team || !dragName) return;
+                          await moveEmployee(team, dragName, r.name);
+                          setDragName(null);
+                          setDragTeam(null);
+                          setDragOverName(null);
+                        }}
+                      >
+                        <td className="col-drag">
+                          <button
+                            type="button"
+                            className="drag-handle"
+                            title="드래그하여 순서 변경"
+                            draggable
+                            onDragStart={(e) => {
+                              setDragName(r.name);
+                              setDragTeam(team);
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", r.name);
+                            }}
+                            onDragEnd={() => {
+                              setDragName(null);
+                              setDragTeam(null);
+                              setDragOverName(null);
+                            }}
+                          >
+                            ⋮⋮
+                          </button>
+                        </td>
+                        <td>{r.name}</td>
+                        <td>{r.grade}</td>
+                        <td>
+                          <Link
+                            href={`/e/${encodeURIComponent(r.name)}`}
+                            className="edit-row-btn"
+                          >
+                            KPI 보기
+                          </Link>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="edit-row-btn"
+                            onClick={() => {
+                              setEditName(r.name);
+                              setEditForm({
+                                name: r.name,
+                                team: r.team,
+                                grade: r.grade,
+                                isFormer: r.isFormer,
+                              });
+                            }}
+                          >
+                            수정
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="del-row-btn"
+                            onClick={async () => {
+                              if (confirm(`${r.name} 직원을 삭제할까요?`)) {
+                                await deleteEmployee(r.name);
+                              }
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
       <div className="admin-page-section">
         <h4>
           업체 관리{" "}

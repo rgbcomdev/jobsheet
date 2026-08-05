@@ -41,6 +41,7 @@ type Ctx = {
   deleteEmployee: (name: string) => Promise<void>;
   upsertCompany: (name: string, info: CompanyInfo) => Promise<void>;
   deleteCompany: (name: string) => Promise<void>;
+  reorderEmployees: (team: string, orderedNames: string[]) => Promise<void>;
   replaceFromBackup: (partial: Partial<JobsheetSeed>) => void;
   activeEmployeesByTeam: Record<string, string[]>;
   allEmployeeNames: string[];
@@ -337,11 +338,18 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
             .update({ owner: emp.name })
             .eq("owner", emp.oldName);
         }
+        const { count } = await sb
+          .from("employees")
+          .select("*", { count: "exact", head: true })
+          .eq("team", emp.team);
         await sb.from("employees").upsert({
           name: emp.name,
           team: emp.team,
           grade: emp.grade,
           is_former: !!emp.isFormer,
+          ...(!emp.oldName
+            ? { sort_order: count ?? 0 }
+            : {}),
         });
       }
     },
@@ -366,6 +374,34 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
     const sb = getSupabase();
     if (sb) await sb.from("employees").delete().eq("name", name);
   }, []);
+
+  /** 팀 내 직원 표시 순서 변경 (대시보드 카드 순서 = sort_order) */
+  const reorderEmployees = useCallback(
+    async (team: string, orderedNames: string[]) => {
+      setData((prev) => {
+        const current = prev.employees[team] || [];
+        const orderedSet = new Set(orderedNames);
+        const remaining = current.filter((n) => !orderedSet.has(n));
+        return {
+          ...prev,
+          employees: {
+            ...prev.employees,
+            [team]: [...orderedNames, ...remaining],
+          },
+        };
+      });
+
+      const sb = getSupabase();
+      if (sb) {
+        await Promise.all(
+          orderedNames.map((name, idx) =>
+            sb.from("employees").update({ sort_order: idx }).eq("name", name)
+          )
+        );
+      }
+    },
+    []
+  );
 
   const upsertCompany = useCallback(
     async (name: string, info: CompanyInfo) => {
@@ -461,6 +497,7 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
     deleteEmployee,
     upsertCompany,
     deleteCompany,
+    reorderEmployees,
     replaceFromBackup,
     activeEmployeesByTeam,
     allEmployeeNames,

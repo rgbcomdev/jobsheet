@@ -257,7 +257,7 @@
     border: 0.5px solid var(--border-strong); background: #fff; color: var(--text-secondary); cursor: pointer; }
   .team-tab-btn:hover { border-color: var(--accent); color: var(--accent); }
   .team-tab-btn.active { background: var(--text); border-color: var(--text); color: #fff; }
-  .role-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 6px; margin-left: 4px; vertical-align: middle; }
+  .role-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 6px; margin-right: 4px; vertical-align: middle; }
   .role-badge.role-디자인 { background: var(--accent-bg); color: var(--accent); }
   .role-badge.role-퍼블 { background: #eef1f7; color: #4a5a7a; }
   .contrib-time-line { font-size: 12px; color: var(--text-secondary); }
@@ -270,6 +270,25 @@
   .admin-list-table td { padding: 7px 10px; vertical-align: middle; }
   .admin-list-table tr:hover td { background: var(--hover, #fafaf8); }
   .admin-list-table tr.row-former td { color: var(--text-muted); background: #fafaf8; }
+  .admin-team-block { margin-top: 14px; }
+  .admin-team-title {
+    font-size: 13px; font-weight: 700; margin: 0 0 8px; color: var(--text-secondary);
+  }
+  .admin-list-table th.col-drag,
+  .admin-list-table td.col-drag {
+    width: 36px; padding-left: 6px; padding-right: 6px;
+  }
+  .drag-handle {
+    font-family: inherit; font-size: 14px; letter-spacing: -2px; line-height: 1;
+    padding: 4px 6px; border: none; background: transparent; color: var(--text-muted);
+    cursor: grab; border-radius: 4px;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-handle:hover { color: var(--text); background: var(--hover, #f0eeea); }
+  .admin-list-table tr.is-dragging td { opacity: 0.45; }
+  .admin-list-table tr.drag-over td {
+    box-shadow: inset 0 2px 0 0 var(--accent);
+  }
   .admin-edit-input {
     width: 100%; font-family: inherit; font-size: 12.5px; border: 0.5px solid transparent; border-radius: 6px;
     padding: 5px 7px; background: transparent; text-align: left; transition: border-color 0.15s, background 0.15s;
@@ -398,6 +417,65 @@
   .task-item-line { font-size: 11px; color: var(--text-secondary); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
   .cat-group-row td { background: var(--bg); font-size: 11.5px; font-weight: 700; color: var(--text-secondary); padding: 7px 10px; border-top: 1px solid var(--border-strong); }
   .project-subtotal-row td { background: #fafaf8; border-top: 1px solid var(--border); border-bottom: 2px solid var(--border-strong); }
+  .clickable-row { cursor: pointer; }
+  .clickable-row:hover td { background: var(--hover, #f5f3ef); }
+  .cal-cell.flash-jump {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    animation: cal-flash 1.6s ease;
+  }
+  @keyframes cal-flash {
+    0%, 100% { background: transparent; }
+    20%, 60% { background: var(--accent-bg); }
+  }
+
+  .projects-toolbar-section { padding-top: 18px; }
+  .projects-toolbar {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 8px;
+  }
+  .projects-toolbar-main {
+    display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap;
+  }
+  .projects-filter-group {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .projects-filter-label {
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+  .projects-seg {
+    display: inline-flex; padding: 3px; gap: 2px;
+    background: var(--bg); border: 0.5px solid var(--border);
+    border-radius: 10px;
+  }
+  .projects-seg-btn {
+    font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 7px 14px; border: none; border-radius: 7px;
+    background: transparent; color: var(--text-secondary); cursor: pointer;
+  }
+  .projects-seg-btn:hover { color: var(--text); }
+  .projects-seg-btn.active {
+    background: #fff; color: var(--text);
+    box-shadow: 0 1px 2px rgba(40, 38, 34, 0.08);
+  }
+  .projects-month-select {
+    font-family: inherit; font-size: 12.5px; font-weight: 500;
+    min-width: 180px; padding: 8px 12px;
+    border: 0.5px solid var(--border-strong); border-radius: 8px;
+    background: #fff; color: var(--text); cursor: pointer;
+  }
+  .projects-month-select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .projects-excel-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .projects-toolbar-hint {
+    margin: 0 0 14px; font-size: 11.5px; color: var(--text-muted);
+    line-height: 1.4;
+  }
 
   .dot2 { display: inline-block; width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.06); }
   .dot2.on-시안 { background: var(--dot-시안); } .dot2.on-본작업 { background: var(--dot-본작업); }

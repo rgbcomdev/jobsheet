@@ -17,6 +17,30 @@ export const CATEGORIES = [
 export const SUBTYPES = ["디자인", "퍼블"] as const;
 export const HAS_SUBTYPE = new Set(["홈페이지", "전자카탈로그"]);
 
+/** 전체 프로젝트: 디자인/퍼블 구역 분리 대상 */
+export const SPLIT_DESIGN_PUBLISH = new Set([
+  "홈페이지",
+  "관리자홈페이지",
+  "전자카탈로그",
+]);
+
+/** 전체 프로젝트 정렬용 카테고리 순서 */
+export const FULL_CATEGORY_ORDER = [
+  "홈페이지",
+  "관리자홈페이지",
+  "전자카탈로그",
+  "종이카탈로그",
+  "브랜드",
+  "시각",
+  "SNS",
+  "내부업무",
+  "RGB내부업무",
+  "RGB외부업무",
+  "3D영상",
+  "촬영영상",
+  "모션영상",
+] as const;
+
 export const LEAVE_TYPES = [
   "연차",
   "오전반차",
@@ -96,8 +120,15 @@ export const DEFAULT_PROJECT_TYPES_BY_MAJOR: Record<string, string[]> = {
     "시각",
     "SNS",
     "RGB내부업무",
+    "RGB외부업무",
   ],
-  동영상: ["3D영상", "촬영영상", "모션영상", "RGB내부업무"],
+  동영상: [
+    "3D영상",
+    "촬영영상",
+    "모션영상",
+    "RGB내부업무",
+    "RGB외부업무",
+  ],
 };
 
 export const DESIGN_GRID: [number, number][] = [

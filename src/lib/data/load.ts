@@ -118,7 +118,18 @@ export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
   ]);
 
   const seed = emptySeed();
-  employees.forEach((e) => {
+  const teamRank = (team: string) =>
+    team === "디자인" ? 0 : team === "영상" ? 1 : 2;
+  const sortedEmployees = [...employees].sort((a, b) => {
+    const ta = teamRank(String(a.team));
+    const tb = teamRank(String(b.team));
+    if (ta !== tb) return ta - tb;
+    const sa = Number(a.sort_order ?? 999);
+    const sb = Number(b.sort_order ?? 999);
+    if (sa !== sb) return sa - sb;
+    return String(a.name).localeCompare(String(b.name), "ko");
+  });
+  sortedEmployees.forEach((e) => {
     const team = String(e.team);
     const name = String(e.name);
     if (!seed.employees[team]) seed.employees[team] = [];

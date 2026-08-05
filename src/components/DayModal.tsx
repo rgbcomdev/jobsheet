@@ -26,8 +26,6 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     data,
     getLeave,
     setLeave,
-    getPublicDuty,
-    setPublicDuty,
     getStatus,
     setStatus,
     saveDayEntries,
@@ -81,7 +79,6 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   const dt = new Date(date);
   const title = `${dt.getMonth() + 1}월 ${dt.getDate()}일 ${WEEKDAYS_KO[dt.getDay()]}요일`;
   const leaveType = getLeave(owner, date);
-  const publicDuty = getPublicDuty(owner, date);
 
   const defaultDayRows = (): WorkEntry[] => [
     {
@@ -356,8 +353,11 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     return fromCompany || "디자인";
   };
 
-  const projectsForMajor = (major: string) =>
-    projectTypes[major] || DEFAULT_PROJECT_TYPES_BY_MAJOR[major] || [];
+  const projectsForMajor = (major: string) => {
+    const fromData = projectTypes[major] || [];
+    const fromDefault = DEFAULT_PROJECT_TYPES_BY_MAJOR[major] || [];
+    return Array.from(new Set([...fromData, ...fromDefault]));
+  };
 
   return (
     <div className="overlay open" onClick={onClose}>
@@ -411,23 +411,6 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                   </button>
                 ))}
               </div>
-              <span className="leave-panel-label">공공업무</span>
-              <select
-                value={publicDuty}
-                onChange={(e) => setPublicDuty(owner, date, e.target.value)}
-              >
-                <option value="">없음</option>
-                <option value="공공업무">공공업무</option>
-              </select>
-              {publicDuty && (
-                <button
-                  type="button"
-                  className="leave-clear-btn"
-                  onClick={() => setPublicDuty(owner, date, "")}
-                >
-                  공공업무 해제
-                </button>
-              )}
               <span className="leave-panel-note">
                 같은 휴가 유형을 다시 누르거나 &apos;휴가 해제&apos;로 삭제할 수
                 있습니다. 연차/반차는 근무시간 합계에서 제외됩니다.

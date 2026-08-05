@@ -137,3 +137,84 @@ export function exportProjectsExcel(
   XLSX.utils.book_append_sheet(wb, ws, "프로젝트");
   XLSX.writeFile(wb, `${owner}_전체프로젝트_${statusFilter}.xlsx`);
 }
+
+/** v17 전체 프로젝트 화면과 동일한 엑셀 형식 */
+export function exportAllTimeProjectsExcel(
+  owner: string,
+  statusFilter: string,
+  monthFilter: string,
+  rows: {
+    company: string;
+    major: string;
+    project: string;
+    estimate: string;
+    stages: Record<string, number>;
+    status: string;
+    total: number;
+    finishMonth: string;
+  }[],
+  grandTotal: number
+) {
+  const aoa: (string | number)[][] = [
+    [
+      `${owner}님의 전체 프로젝트`,
+      `진행상태: ${statusFilter}`,
+      `완료월: ${monthFilter}`,
+    ],
+    [],
+    [
+      "업체명",
+      "대분류",
+      "세부",
+      "작업항목",
+      "견적(만원)",
+      "시안(h)",
+      "본작업(h)",
+      "수정중(h)",
+      "제작중(h)",
+      "진행상태",
+      "합계시간(h)",
+      "총계시간(h)",
+      "완료월",
+    ],
+  ];
+  rows.forEach((r) => {
+    const estNum = Number(
+      String(r.estimate).replace(/[^\d.-]/g, "")
+    );
+    aoa.push([
+      r.company,
+      r.major,
+      r.project,
+      "",
+      Number.isFinite(estNum) && r.estimate !== "-" ? estNum : r.estimate,
+      r.stages["시안"] || 0,
+      r.stages["본작업"] || 0,
+      r.stages["수정중"] || 0,
+      r.stages["제작중"] || 0,
+      r.status,
+      r.total,
+      r.total,
+      r.finishMonth,
+    ]);
+  });
+  aoa.push([
+    "합계",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    grandTotal,
+    "",
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "전체 프로젝트");
+  XLSX.writeFile(wb, `${owner}_전체프로젝트_${statusFilter}.xlsx`);
+}
