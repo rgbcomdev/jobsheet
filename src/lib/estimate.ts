@@ -189,15 +189,19 @@ export type GradeAssignee = { grade: string; ratio: number };
 export function resolveGradeAssignees(
   grade1: string,
   grade2: string,
+  grade3: string,
   ratio1: number,
-  ratio2: number
+  ratio2: number,
+  ratio3: number
 ): GradeAssignee[] {
   const r1 = Math.min(100, Math.max(0, ratio1 || 0));
   const r2 = Math.min(100, Math.max(0, ratio2 || 0));
-  if (grade2) {
-    const out: GradeAssignee[] = [];
-    if (r1 > 0) out.push({ grade: grade1, ratio: r1 });
-    if (r2 > 0) out.push({ grade: grade2, ratio: r2 });
+  const r3 = Math.min(100, Math.max(0, ratio3 || 0));
+  const out: GradeAssignee[] = [];
+  if (grade3 || grade2) {
+    if (grade1 && r1 > 0) out.push({ grade: grade1, ratio: r1 });
+    if (grade2 && r2 > 0) out.push({ grade: grade2, ratio: r2 });
+    if (grade3 && r3 > 0) out.push({ grade: grade3, ratio: r3 });
     return out;
   }
   if (grade1) return [{ grade: grade1, ratio: 100 }];

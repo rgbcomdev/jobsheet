@@ -15,6 +15,7 @@ import {
   STAGES,
 } from "@/lib/constants";
 import { fmWon } from "@/lib/estimate";
+import { exportTeamKpiExcel } from "@/lib/excel";
 
 type TeamTab = "전체" | "디자인" | "동영상";
 
@@ -27,6 +28,8 @@ export function TeamKpiView() {
   const [monthFilter, setMonthFilter] = useState<string>("");
   const [projectFilter, setProjectFilter] = useState("전체");
   const [employeeFilter, setEmployeeFilter] = useState("전체");
+  const [exportStart, setExportStart] = useState("");
+  const [exportEnd, setExportEnd] = useState("");
 
   useEffect(() => {
     if (loading || monthSynced) return;
@@ -41,6 +44,17 @@ export function TeamKpiView() {
       .sort()
       .reverse();
   }, [data.entries]);
+
+  const monthsAsc = useMemo(
+    () => [...allMonths].sort(),
+    [allMonths]
+  );
+
+  useEffect(() => {
+    if (!monthsAsc.length) return;
+    setExportStart((prev) => prev || monthsAsc[0]);
+    setExportEnd((prev) => prev || monthsAsc[monthsAsc.length - 1]);
+  }, [monthsAsc]);
 
   const monthPrefix = monthFilter === "전체" || !monthFilter ? null : monthFilter;
 
@@ -187,72 +201,237 @@ export function TeamKpiView() {
     { key: "동영상", label: "영상팀", count: counts.video },
   ];
 
+  const handleExportExcel = () => {
+    let start = exportStart;
+    let end = exportEnd;
+    if (!start || !end) {
+      alert("시작월과 종료월을 선택해주세요.");
+      return;
+    }
+    if (start > end) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+
+    const months: string[] = [];
+    {
+      let y = Number(start.slice(0, 4));
+      let m = Number(start.slice(5, 7));
+      const ey = Number(end.slice(0, 4));
+      const em = Number(end.slice(5, 7));
+      while (y < ey || (y === ey && m <= em)) {
+        months.push(`${y}-${String(m).padStart(2, "0")}`);
+        m += 1;
+        if (m > 12) {
+          m = 1;
+          y += 1;
+        }
+      }
+    }
+
+    // key: company|||project → worker → month → hours
+    const byProject: Record<
+      string,
+      {
+        company: string;
+        project: string;
+        major: string;
+        workers: Record<string, Record<string, number>>;
+      }
+    > = {};
+
+    data.entries.forEach((e) => {
+      if (!e.company || !e.project) return;
+      const ym = e.date.slice(0, 7);
+      if (ym < start || ym > end) return;
+      if (employeeFilter !== "전체" && e.owner !== employeeFilter) return;
+      if (projectFilter !== "전체" && e.project !== projectFilter) return;
+      const { major } = deriveMajorSub(
+        e.project,
+        e.company,
+        data.companyCat,
+        data.projectTypesByMajor
+      );
+      if (tab !== "전체") {
+        if (e.project !== "RGB내부업무" && major !== tab) return;
+      }
+      const leave = data.leaveData[`${e.owner}|||${e.date}`] || "";
+      const dur = computeDuration(e.start, e.end, leave);
+      if (dur <= 0) return;
+      const key = `${e.company}|||${e.project}`;
+      if (!byProject[key]) {
+        byProject[key] = {
+          company: e.company,
+          project: e.project,
+          major,
+          workers: {},
+        };
+      }
+      const owner = e.owner || "-";
+      if (!byProject[key].workers[owner]) byProject[key].workers[owner] = {};
+      byProject[key].workers[owner][ym] =
+        (byProject[key].workers[owner][ym] || 0) + dur;
+    });
+
+    const projects = Object.values(byProject)
+      .map((p) => {
+        const workers = Object.entries(p.workers)
+          .map(([name, byMonth]) => {
+            const total = Object.values(byMonth).reduce((a, b) => a + b, 0);
+            return { name, byMonth, total };
+          })
+          .sort((a, b) => b.total - a.total);
+        const estimate =
+          data.estimates[`${p.company}|||${p.project}`] ?? null;
+        return {
+          company: p.company,
+          project: p.project,
+          major: p.major === "동영상" ? "영상" : p.major,
+          estimate,
+          status:
+            getStatus(p.company, p.project) === "완료" ? "완료" : "진행중",
+          workers,
+        };
+      })
+      .filter((p) => p.workers.length > 0)
+      .sort((a, b) => {
+        const ta = a.workers.reduce((s, w) => s + w.total, 0);
+        const tb = b.workers.reduce((s, w) => s + w.total, 0);
+        return tb - ta;
+      });
+
+    if (!projects.length) {
+      alert("선택한 기간에 내보낼 데이터가 없습니다.");
+      return;
+    }
+
+    const tabLabel =
+      tab === "전체" ? "전체" : tab === "디자인" ? "디자인팀" : "영상팀";
+    exportTeamKpiExcel({
+      startMonth: start,
+      endMonth: end,
+      tabLabel,
+      months,
+      projects,
+    });
+  };
+
   return (
     <div className="wrap">
-      <div className="dash-head">
-        <Link href="/admin" className="back-btn">
-          ← 통합관리
-        </Link>
+      <div className="dash-head team-kpi-head">
+        <div className="back-btn-group">
+          <Link href="/admin" className="back-btn">
+            ← 통합관리
+          </Link>
+          <Link href="/" className="back-btn">
+            ← 대시보드
+          </Link>
+        </div>
         <h1>전체 직원 통합 보기 (KPI)</h1>
         <div />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={"team-tab-btn" + (tab === t.key ? " active" : "")}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-            <span style={{ marginLeft: 6, opacity: 0.7, fontWeight: 500 }}>
-              {t.count}
-            </span>
-          </button>
-        ))}
-      </div>
+      <div className="team-toolbar">
+        <div className="team-toolbar-row">
+          <div className="team-tabs">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                className={"team-tab-btn" + (tab === t.key ? " active" : "")}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+                <span className="team-tab-count">{t.count}</span>
+              </button>
+            ))}
+          </div>
+          <div className="team-export-bar">
+            <span className="team-export-label">엑셀</span>
+            <select
+              value={exportStart}
+              onChange={(e) => setExportStart(e.target.value)}
+              aria-label="시작월"
+            >
+              {monthsAsc.map((m) => (
+                <option key={m} value={m}>
+                  {m.replace("-", "년 ")}월
+                </option>
+              ))}
+            </select>
+            <span className="team-export-tilde">~</span>
+            <select
+              value={exportEnd}
+              onChange={(e) => setExportEnd(e.target.value)}
+              aria-label="종료월"
+            >
+              {monthsAsc.map((m) => (
+                <option key={m} value={m}>
+                  {m.replace("-", "년 ")}월
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="backup-btn"
+              onClick={handleExportExcel}
+            >
+              다운로드
+            </button>
+          </div>
+        </div>
 
-      <div className="team-filters">
-        <select
-          value={monthFilter || "전체"}
-          onChange={(e) => setMonthFilter(e.target.value)}
-        >
-          <option value="전체">전체 기간</option>
-          {allMonths.map((m) => (
-            <option key={m} value={m}>
-              {m.replace("-", "년 ")}월
-            </option>
-          ))}
-        </select>
-        <select
-          value={projectFilter}
-          onChange={(e) => setProjectFilter(e.target.value)}
-        >
-          <option value="전체">
-            {tab === "디자인"
-              ? "디자인 전체"
-              : tab === "동영상"
-                ? "영상 전체"
-                : "프로젝트 전체"}
-          </option>
-          {projectOptions.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <select
-          value={employeeFilter}
-          onChange={(e) => setEmployeeFilter(e.target.value)}
-        >
-          <option value="전체">담당자 전체</option>
-          {employeeOptions.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
+        <div className="team-filters">
+          <label className="team-filter-field">
+            <span>보기 기간</span>
+            <select
+              value={monthFilter || "전체"}
+              onChange={(e) => setMonthFilter(e.target.value)}
+            >
+              <option value="전체">전체 기간</option>
+              {allMonths.map((m) => (
+                <option key={m} value={m}>
+                  {m.replace("-", "년 ")}월
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="team-filter-field">
+            <span>프로젝트</span>
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+            >
+              <option value="전체">
+                {tab === "디자인"
+                  ? "디자인 전체"
+                  : tab === "동영상"
+                    ? "영상 전체"
+                    : "프로젝트 전체"}
+              </option>
+              {projectOptions.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="team-filter-field">
+            <span>담당자</span>
+            <select
+              value={employeeFilter}
+              onChange={(e) => setEmployeeFilter(e.target.value)}
+            >
+              <option value="전체">담당자 전체</option>
+              {employeeOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="team-full-table-wrap">

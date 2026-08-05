@@ -14,12 +14,15 @@ import {
 import { computeDuration, computeOvertime, round1 } from "@/lib/time";
 import { summarizeNoteForCell } from "@/lib/aggregate";
 import {
+  clampEntryToLeaveBounds,
+  clampTimeToLeaveBounds,
   computeDayTotalHours,
   findInvertedTimeEntry,
   findOverlappingEntries,
   formatDaySaveOkMessage,
   formatDayValidationError,
   getLeaveTimeBounds,
+  getLeaveWorkWindowLabel,
 } from "@/lib/dayValidation";
 import { stageRuleWarning } from "@/lib/stageRules";
 import { CompanyAutocomplete } from "./CompanyAutocomplete";
@@ -79,9 +82,104 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   const [saveMsgKind, setSaveMsgKind] = useState<"ok" | "warn" | "error">("ok");
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const leave = getLeave(owner, date);
+    setLeaveOpen(!!leave);
+    if (leave === "연차") {
+      setRows([]);
+      return;
+    }
+    if (!leave) {
       setRows(initial);
-      setLeaveOpen(!!getLeave(owner, date));
+      return;
+    }
+    const bounds = getLeaveTimeBounds(leave);
+    const next = initial
+      .map((e) => clampEntryToLeaveBounds(e, bounds))
+      .filter((e): e is WorkEntry => !!e);
+    if (next.length) {
+      setRows(next);
+      return;
+    }
+    // 허용 시간대에 남는 블록이 없으면 휴가 기본 시간대로 채움
+    if (leave === "오전반차") {
+      setRows([
+        {
+          date,
+          owner,
+          start: "14:00",
+          end: "18:00",
+          company: "",
+          project: "",
+          note: "",
+          stage: "본작업",
+          major: "디자인",
+        },
+      ]);
+    } else if (leave === "오후반차") {
+      setRows([
+        {
+          date,
+          owner,
+          start: "09:00",
+          end: "14:00",
+          company: "",
+          project: "",
+          note: "",
+          stage: "본작업",
+          major: "디자인",
+        },
+      ]);
+    } else if (leave === "오전반반차") {
+      setRows([
+        {
+          date,
+          owner,
+          start: "11:00",
+          end: "12:00",
+          company: "",
+          project: "",
+          note: "",
+          stage: "본작업",
+          major: "디자인",
+        },
+        {
+          date,
+          owner,
+          start: "13:00",
+          end: "18:00",
+          company: "",
+          project: "",
+          note: "",
+          stage: "본작업",
+          major: "디자인",
+        },
+      ]);
+    } else if (leave === "오후반반차") {
+      setRows([
+        {
+          date,
+          owner,
+          start: "09:00",
+          end: "12:00",
+          company: "",
+          project: "",
+          note: "",
+          stage: "본작업",
+          major: "디자인",
+        },
+        {
+          date,
+          owner,
+          start: "13:00",
+          end: "16:00",
+          company: "",
+          project: "",
+          note: "",
+          stage: "본작업",
+          major: "디자인",
+        },
+      ]);
     }
   }, [open, initial, getLeave, owner, date]);
 
@@ -128,13 +226,16 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     setRows((prev) =>
       prev.map((r, idx) => {
         if (idx !== i) return r;
-        const next = { ...r, ...patch };
         const bounds = getLeaveTimeBounds(getLeave(owner, date));
-        if (bounds.minStart && next.start < bounds.minStart) {
-          next.start = bounds.minStart;
-        }
-        if (bounds.maxEnd && next.end > bounds.maxEnd) {
-          next.end = bounds.maxEnd;
+        const next = { ...r, ...patch };
+        next.start = clampTimeToLeaveBounds(next.start, bounds);
+        next.end = clampTimeToLeaveBounds(next.end, bounds);
+        if (next.end <= next.start) {
+          // 종료가 시작보다 빠르면 허용 구간 끝으로 맞춤
+          if (bounds.maxEnd) next.end = bounds.maxEnd;
+          if (next.end <= next.start && bounds.minStart) {
+            next.start = bounds.minStart;
+          }
         }
         return next;
       })
@@ -186,11 +287,12 @@ export function DayModal({ owner, date, open, onClose }: Props) {
       setRows([]);
       return;
     }
+    const bounds = getLeaveTimeBounds(type);
     if (type === "오전반차") {
       setRows((prev) => {
         let next = prev
-          .filter((e) => !(e.end <= "14:00"))
-          .map((e) => (e.start < "14:00" ? { ...e, start: "14:00" } : e));
+          .map((e) => clampEntryToLeaveBounds(e, bounds))
+          .filter((e): e is WorkEntry => !!e);
         if (!next.length) {
           next = [
             {
@@ -202,6 +304,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
           ];
         }
@@ -210,19 +313,20 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     } else if (type === "오후반차") {
       setRows((prev) => {
         let next = prev
-          .filter((e) => !(e.start >= "13:00"))
-          .map((e) => (e.end > "13:00" ? { ...e, end: "13:00" } : e));
+          .map((e) => clampEntryToLeaveBounds(e, bounds))
+          .filter((e): e is WorkEntry => !!e);
         if (!next.length) {
           next = [
             {
               date,
               owner,
               start: "09:00",
-              end: "13:00",
+              end: "14:00",
               company: "",
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
           ];
         }
@@ -231,10 +335,9 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     } else if (type === "오전반반차") {
       setRows((prev) => {
         let next = prev
-          .filter((e) => !(e.end <= "11:00"))
-          .map((e) => (e.start < "11:00" ? { ...e, start: "11:00" } : e));
+          .map((e) => clampEntryToLeaveBounds(e, bounds))
+          .filter((e): e is WorkEntry => !!e);
         if (!next.length) {
-          // v17: 점심 제외 두 블록
           next = [
             {
               date,
@@ -245,6 +348,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
             {
               date,
@@ -255,6 +359,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
           ];
         } else if (
@@ -273,6 +378,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
           ];
         }
@@ -281,8 +387,8 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     } else if (type === "오후반반차") {
       setRows((prev) => {
         let next = prev
-          .filter((e) => !(e.start >= "16:00"))
-          .map((e) => (e.end > "16:00" ? { ...e, end: "16:00" } : e));
+          .map((e) => clampEntryToLeaveBounds(e, bounds))
+          .filter((e): e is WorkEntry => !!e);
         if (!next.length) {
           next = [
             {
@@ -294,6 +400,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
             {
               date,
@@ -304,6 +411,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
           ];
         } else if (
@@ -322,6 +430,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               project: "",
               note: "",
               stage: "본작업",
+              major: "디자인",
             },
           ];
         }
@@ -330,10 +439,13 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     }
   };
 
-  const hoursOptions = Array.from({ length: 24 }, (_, i) =>
+  const leaveBounds = getLeaveTimeBounds(leaveType);
+  const leaveWindowLabel = getLeaveWorkWindowLabel(leaveType);
+
+  const hoursOptionsAll = Array.from({ length: 24 }, (_, i) =>
     String(i).padStart(2, "0")
   );
-  const minOptions = ["00", "10", "20", "30", "40", "50"];
+  const minOptionsAll = ["00", "10", "20", "30", "40", "50"];
 
   const TimeSelect = ({
     value,
@@ -343,12 +455,39 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     onChange: (v: string) => void;
   }) => {
     const [h, m] = value.split(":");
+    const minT = leaveBounds.minStart;
+    const maxT = leaveBounds.maxEnd;
+    const minH = minT ? Number(minT.slice(0, 2)) : 0;
+    const maxH = maxT ? Number(maxT.slice(0, 2)) : 23;
+    const minM = minT ? Number(minT.slice(3, 5)) : 0;
+    const maxM = maxT ? Number(maxT.slice(3, 5)) : 50;
+
+    const hoursOptions = hoursOptionsAll.filter((x) => {
+      const n = Number(x);
+      return n >= minH && n <= maxH;
+    });
+
+    const minOptions = minOptionsAll.filter((x) => {
+      const n = Number(x);
+      const hour = Number(h);
+      if (hour === minH && n < minM) return false;
+      if (hour === maxH && n > maxM) return false;
+      return true;
+    });
+
     return (
       <>
         <select
           className="time-h"
           value={h}
-          onChange={(e) => onChange(`${e.target.value}:${m}`)}
+          onChange={(e) => {
+            const nh = e.target.value;
+            let nm = m;
+            const hour = Number(nh);
+            if (hour === minH && Number(nm) < minM) nm = String(minM).padStart(2, "0");
+            if (hour === maxH && Number(nm) > maxM) nm = String(maxM).padStart(2, "0");
+            onChange(`${nh}:${nm}`);
+          }}
         >
           {hoursOptions.map((x) => (
             <option key={x} value={x}>
@@ -359,7 +498,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
         <span className="colon">:</span>
         <select
           className="time-m"
-          value={m}
+          value={minOptions.includes(m) ? m : minOptions[0] || m}
           onChange={(e) => onChange(`${h}:${e.target.value}`)}
         >
           {minOptions.map((x) => (
@@ -373,10 +512,11 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   };
 
   const handleSave = async () => {
-    if (!validateRows("save")) return;
+    const toSave = leaveType === "연차" ? [] : rows;
+    if (leaveType !== "연차" && !validateRows("save")) return;
     setSaving(true);
-    await saveDayEntries(owner, date, rows);
-    const dayTotal = computeDayTotalHours(rows, leaveType);
+    await saveDayEntries(owner, date, toSave);
+    const dayTotal = computeDayTotalHours(toSave, leaveType);
     const ok = formatDaySaveOkMessage(dayTotal);
     setSaveMsg(ok.text);
     setSaveMsgKind(ok.kind);
@@ -388,6 +528,10 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   };
 
   const tryClose = () => {
+    if (leaveType === "연차") {
+      onClose();
+      return;
+    }
     if (!validateRows("close")) return;
     onClose();
   };
@@ -406,7 +550,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
       end = "18:00";
     } else if (leaveType === "오후반차") {
       start = "09:00";
-      end = "13:00";
+      end = "14:00";
     } else if (leaveType === "오전반반차") {
       const hasFirst = rows.some((e) => e.start === "11:00");
       if (hasFirst) {
@@ -539,12 +683,24 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                 같은 휴가 유형을 다시 누르거나 &apos;휴가 해제&apos;로 삭제할 수
                 있습니다. 연차/반차는 근무시간 합계에서 제외됩니다.
               </span>
+              {leaveWindowLabel && (
+                <span className="leave-panel-note leave-window-note">
+                  {leaveWindowLabel}
+                </span>
+              )}
             </div>
           )}
         </div>
 
         <div id="modalEntries">
-          {rows.map((e, i) => {
+          {leaveType === "연차" ? (
+            <div className="leave-day-blocked">
+              연차로 처리된 날입니다. 업무 시간을 추가할 수 없습니다.
+              <br />
+              업무를 입력하려면 상단에서 휴가를 해제해주세요.
+            </div>
+          ) : (
+            rows.map((e, i) => {
             const leave = leaveType;
             const dur = computeDuration(e.start, e.end, leave);
             const ot = computeOvertime(e.start, e.end);
@@ -671,12 +827,15 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </div>
 
-        <button type="button" className="modal-add" onClick={addTimeBlock}>
-          + 시간대 추가
-        </button>
+        {leaveType !== "연차" && (
+          <button type="button" className="modal-add" onClick={addTimeBlock}>
+            + 시간대 추가
+          </button>
+        )}
 
         <div className="modal-footer">
           <span

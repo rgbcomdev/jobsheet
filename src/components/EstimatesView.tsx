@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useJobsheet } from "@/context/JobsheetContext";
 import {
-  computeCategoryBaseline,
   computeStageRatioByCategory,
 } from "@/lib/kpi";
 import {
@@ -14,7 +13,6 @@ import {
   estimateStagePlanForRole,
   estimateStagePlanFromBudget,
   resolveGradeAssignees,
-  fmWon,
 } from "@/lib/estimate";
 import {
   DEFAULT_GRADE_DAILY_RATE,
@@ -28,90 +26,150 @@ import { round1 } from "@/lib/time";
 type GradeGroupState = {
   grade1: string;
   grade2: string;
+  grade3: string;
   ratio1: number;
   ratio2: number;
+  ratio3: number;
 };
 
 const defaultGrade = (): GradeGroupState => ({
   grade1: "대리",
   grade2: "",
+  grade3: "",
   ratio1: 100,
   ratio2: 0,
+  ratio3: 0,
 });
+
+function GradeSlot({
+  index,
+  grade,
+  ratio,
+  showRatio,
+  canClear,
+  onGrade,
+  onRatio,
+}: {
+  index: number;
+  grade: string;
+  ratio: number;
+  showRatio: boolean;
+  canClear: boolean;
+  onGrade: (v: string) => void;
+  onRatio: (v: number) => void;
+}) {
+  return (
+    <div className="estimate-slot">
+      <span className="estimate-slot-label">담당 {index}</span>
+      <select value={grade} onChange={(e) => onGrade(e.target.value)}>
+        {canClear && <option value="">없음</option>}
+        {GRADE_OPTIONS_FOR_ESTIMATE.map((g) => (
+          <option key={g} value={g}>
+            {g}
+          </option>
+        ))}
+      </select>
+      {showRatio ? (
+        <div className="estimate-slot-ratio">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={ratio}
+            onChange={(e) => onRatio(Number(e.target.value) || 0)}
+          />
+          <span>%</span>
+        </div>
+      ) : (
+        <span className="estimate-slot-ratio-fixed">100%</span>
+      )}
+    </div>
+  );
+}
 
 function GradeControls({
   label,
+  tone,
   state,
   onChange,
 }: {
   label: string;
+  tone?: "design" | "publish" | "single";
   state: GradeGroupState;
   onChange: (next: GradeGroupState) => void;
 }) {
+  const multi = !!(state.grade2 || state.grade3);
   return (
-    <div className="estimate-grade-row">
-      <strong style={{ minWidth: 90, fontSize: 13 }}>{label}</strong>
-      <label>담당1</label>
-      <select
-        value={state.grade1}
-        onChange={(e) => onChange({ ...state, grade1: e.target.value })}
-      >
-        {GRADE_OPTIONS_FOR_ESTIMATE.map((g) => (
-          <option key={g} value={g}>
-            {g}
-          </option>
-        ))}
-      </select>
-      {state.grade2 ? (
-        <>
-          <label>비중%</label>
-          <input
-            type="number"
-            style={{ width: 64 }}
-            value={state.ratio1}
-            min={0}
-            max={100}
-            onChange={(e) =>
-              onChange({ ...state, ratio1: Number(e.target.value) || 0 })
+    <div className={"estimate-panel" + (tone ? ` tone-${tone}` : "")}>
+      <div className="estimate-panel-head">{label}</div>
+      <div className="estimate-slots">
+        <GradeSlot
+          index={1}
+          grade={state.grade1}
+          ratio={state.ratio1}
+          showRatio={multi}
+          canClear={false}
+          onGrade={(grade1) => onChange({ ...state, grade1 })}
+          onRatio={(ratio1) => onChange({ ...state, ratio1 })}
+        />
+        <GradeSlot
+          index={2}
+          grade={state.grade2}
+          ratio={state.ratio2}
+          showRatio={!!state.grade2}
+          canClear
+          onGrade={(grade2) => {
+            if (!grade2) {
+              onChange({
+                ...state,
+                grade2: "",
+                grade3: "",
+                ratio1: 100,
+                ratio2: 0,
+                ratio3: 0,
+              });
+              return;
             }
+            onChange({
+              ...state,
+              grade2,
+              ratio1: state.grade3 ? state.ratio1 || 34 : state.ratio1 || 50,
+              ratio2: state.grade3 ? state.ratio2 || 33 : state.ratio2 || 50,
+              ratio3: state.grade3 ? state.ratio3 || 33 : 0,
+            });
+          }}
+          onRatio={(ratio2) => onChange({ ...state, ratio2 })}
+        />
+        {state.grade2 ? (
+          <GradeSlot
+            index={3}
+            grade={state.grade3}
+            ratio={state.ratio3}
+            showRatio={!!state.grade3}
+            canClear
+            onGrade={(grade3) => {
+              if (!grade3) {
+                onChange({
+                  ...state,
+                  grade3: "",
+                  ratio1: state.ratio1 || 50,
+                  ratio2: state.ratio2 || 50,
+                  ratio3: 0,
+                });
+                return;
+              }
+              onChange({
+                ...state,
+                grade3,
+                ratio1: state.ratio1 || 34,
+                ratio2: state.ratio2 || 33,
+                ratio3: state.ratio3 || 33,
+              });
+            }}
+            onRatio={(ratio3) => onChange({ ...state, ratio3 })}
           />
-        </>
-      ) : null}
-      <label>담당2</label>
-      <select
-        value={state.grade2}
-        onChange={(e) => {
-          const grade2 = e.target.value;
-          onChange({
-            ...state,
-            grade2,
-            ratio1: grade2 ? state.ratio1 || 50 : 100,
-            ratio2: grade2 ? state.ratio2 || 50 : 0,
-          });
-        }}
-      >
-        <option value="">없음</option>
-        {GRADE_OPTIONS_FOR_ESTIMATE.map((g) => (
-          <option key={g} value={g}>
-            {g}
-          </option>
-        ))}
-      </select>
-      {state.grade2 ? (
-        <>
-          <label>비중%</label>
-          <input
-            type="number"
-            style={{ width: 64 }}
-            value={state.ratio2}
-            min={0}
-            max={100}
-            onChange={(e) =>
-              onChange({ ...state, ratio2: Number(e.target.value) || 0 })
-            }
-          />
-        </>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -121,6 +179,7 @@ export function EstimatesView() {
   const [tab, setTab] = useState<"디자인" | "동영상">("디자인");
   const [calcCategory, setCalcCategory] = useState("홈페이지");
   const [calcBudget, setCalcBudget] = useState("500");
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [singleGrade, setSingleGrade] = useState(defaultGrade);
   const [designGrade, setDesignGrade] = useState(defaultGrade);
   const [publishGrade, setPublishGrade] = useState(() => ({
@@ -134,18 +193,6 @@ export function EstimatesView() {
       ...data.gradeDailyRate,
     }),
     [data.gradeDailyRate]
-  );
-
-  const baseline = useMemo(
-    () =>
-      computeCategoryBaseline(
-        data.entries,
-        data.projectStatus,
-        data.staffRole,
-        data.leaveData,
-        data.estimates
-      ),
-    [data]
   );
 
   const categories =
@@ -203,8 +250,10 @@ export function EstimatesView() {
           resolveGradeAssignees(
             designGrade.grade1,
             designGrade.grade2,
+            designGrade.grade3,
             designGrade.ratio1,
-            designGrade.ratio2
+            designGrade.ratio2,
+            designGrade.ratio3
           ),
           gradeRates
         ),
@@ -215,8 +264,10 @@ export function EstimatesView() {
           resolveGradeAssignees(
             publishGrade.grade1,
             publishGrade.grade2,
+            publishGrade.grade3,
             publishGrade.ratio1,
-            publishGrade.ratio2
+            publishGrade.ratio2,
+            publishGrade.ratio3
           ),
           gradeRates
         ),
@@ -251,8 +302,10 @@ export function EstimatesView() {
         resolveGradeAssignees(
           singleGrade.grade1,
           singleGrade.grade2,
+          singleGrade.grade3,
           singleGrade.ratio1,
-          singleGrade.ratio2
+          singleGrade.ratio2,
+          singleGrade.ratio3
         ),
         gradeRates
       ),
@@ -292,9 +345,14 @@ export function EstimatesView() {
   return (
     <div className="wrap">
       <div className="dash-head">
-        <Link href="/admin" className="back-btn">
-          ← 통합관리
-        </Link>
+        <div className="back-btn-group">
+          <Link href="/admin" className="back-btn">
+            ← 통합관리
+          </Link>
+          <Link href="/" className="back-btn">
+            ← 대시보드
+          </Link>
+        </div>
         <h1>견적·작업시간 분석</h1>
         <div />
       </div>
@@ -317,49 +375,112 @@ export function EstimatesView() {
       </div>
 
       <div className="admin-page-section">
-        <h4>카테고리별 기준 시급 (완료 프로젝트 트림평균)</h4>
-        <table className="agg">
+        <h4>카테고리별 단계 비율</h4>
+        <table className="agg stage-ratio-table">
           <thead>
             <tr>
               <th>카테고리</th>
               <th className="center">표본</th>
-              <th className="center">평균(원/h)</th>
-              <th className="center">최소</th>
-              <th className="center">최대</th>
-              <th className="center">단계 비율</th>
+              <th className="center">시안</th>
+              <th className="center">본작업</th>
+              <th className="center">수정중</th>
+              <th className="center">제작중</th>
+              <th className="center stage-ratio-toggle-col" />
             </tr>
           </thead>
           <tbody>
-            {categories.map((cat) => {
-              const b = baseline[cat];
-              const ratio = computeStageRatioByCategory(
+            {categories.flatMap((cat) => {
+              const split = SPLIT_DESIGN_PUBLISH.has(cat);
+              const expanded = !!expandedCats[cat];
+              const totalRatio = computeStageRatioByCategory(
                 data.entries,
                 data.projectStatus,
                 data.leaveData,
                 cat
               );
-              return (
+              const mainRow = (
                 <tr key={cat}>
                   <td>{cat}</td>
-                  <td className="center">
-                    {b ? `${b.usedCount}/${b.count}` : "-"}
+                  <td className="center">{totalRatio.sampleCount || "-"}</td>
+                  <td className="center mono">
+                    {totalRatio.total ? `${totalRatio.ratios.시안}%` : "-"}
                   </td>
                   <td className="center mono">
-                    {b ? b.avgWonPerHour.toLocaleString("ko-KR") : "-"}
+                    {totalRatio.total ? `${totalRatio.ratios.본작업}%` : "-"}
                   </td>
                   <td className="center mono">
-                    {b ? b.minWonPerHour.toLocaleString("ko-KR") : "-"}
+                    {totalRatio.total ? `${totalRatio.ratios.수정중}%` : "-"}
                   </td>
                   <td className="center mono">
-                    {b ? b.maxWonPerHour.toLocaleString("ko-KR") : "-"}
+                    {totalRatio.total ? `${totalRatio.ratios.제작중}%` : "-"}
                   </td>
-                  <td className="center" style={{ fontSize: 11 }}>
-                    {ratio.total
-                      ? `시안 ${ratio.ratios.시안}% · 본작 ${ratio.ratios.본작업}% · 수정 ${ratio.ratios.수정중}% · 제작 ${ratio.ratios.제작중}%`
-                      : "-"}
+                  <td className="center stage-ratio-toggle-col">
+                    {split ? (
+                      <button
+                        type="button"
+                        className={
+                          "stage-ratio-toggle" + (expanded ? " open" : "")
+                        }
+                        aria-expanded={expanded}
+                        aria-label={
+                          expanded
+                            ? `${cat} 디자인/퍼블 접기`
+                            : `${cat} 디자인/퍼블 펼치기`
+                        }
+                        onClick={() =>
+                          setExpandedCats((prev) => ({
+                            ...prev,
+                            [cat]: !prev[cat],
+                          }))
+                        }
+                      >
+                        {expanded ? "접기 ▴" : "디자인/퍼블 ▾"}
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               );
+              if (!split || !expanded) return [mainRow];
+
+              const childRows = (["디자인", "퍼블"] as const).map((role) => {
+                const ratio = computeStageRatioByCategory(
+                  data.entries,
+                  data.projectStatus,
+                  data.leaveData,
+                  cat,
+                  data.staffRole,
+                  role
+                );
+                return (
+                  <tr
+                    key={`${cat}-${role}`}
+                    className={
+                      role === "디자인"
+                        ? "stage-ratio-design"
+                        : "stage-ratio-publish"
+                    }
+                  >
+                    <td className="stage-ratio-child-cat">
+                      <span className={`role-badge role-${role}`}>{role}</span>
+                    </td>
+                    <td className="center">{ratio.sampleCount || "-"}</td>
+                    <td className="center mono">
+                      {ratio.total ? `${ratio.ratios.시안}%` : "-"}
+                    </td>
+                    <td className="center mono">
+                      {ratio.total ? `${ratio.ratios.본작업}%` : "-"}
+                    </td>
+                    <td className="center mono">
+                      {ratio.total ? `${ratio.ratios.수정중}%` : "-"}
+                    </td>
+                    <td className="center mono">
+                      {ratio.total ? `${ratio.ratios.제작중}%` : "-"}
+                    </td>
+                    <td className="center stage-ratio-toggle-col" />
+                  </tr>
+                );
+              });
+              return [mainRow, ...childRows];
             })}
           </tbody>
         </table>
@@ -367,155 +488,143 @@ export function EstimatesView() {
 
       <div className="admin-page-section">
         <h4>견적 → 예상 작업시간 계산</h4>
-        <div className="reg-row">
-          <select
-            value={calcCategory}
-            onChange={(e) => setCalcCategory(e.target.value)}
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            placeholder="견적(만원)"
-            value={calcBudget}
-            onChange={(e) => setCalcBudget(e.target.value)}
-          />
-        </div>
 
-        {isSplit ? (
-          <>
-            <GradeControls
-              label="디자인 몫"
-              state={designGrade}
-              onChange={setDesignGrade}
-            />
-            <GradeControls
-              label="퍼블 몫"
-              state={publishGrade}
-              onChange={setPublishGrade}
-            />
-          </>
-        ) : (
-          <GradeControls
-            label="담당"
-            state={singleGrade}
-            onChange={setSingleGrade}
-          />
-        )}
-
-        <p className="admin-sub">
-          기준 시급 환산 총시간:{" "}
-          <b>{hours != null ? `${hours}h` : "기준 데이터 부족"}</b>
-          {hours != null && ` · 약 ${round1(hours / 8)}일 (8h 기준)`}
-        </p>
-        {calcRows.note && <p className="admin-sub">{calcRows.note}</p>}
-
-        {calcRows.rows.length > 0 && (
-          <table className="agg" style={{ marginTop: 12 }}>
-            <thead>
-              <tr>
-                <th className="left">분야</th>
-                <th className="center">담당</th>
-                <th className="center">견적(배분)</th>
-                <th className="center">작업일수</th>
-                {STAGES.map((s) => (
-                  <th className="center" key={s}>
-                    {s}
-                  </th>
+        <div className="estimate-calc-layout">
+          <div className="estimate-calc-inputs">
+            <label className="estimate-field">
+              <span>카테고리</span>
+              <select
+                value={calcCategory}
+                onChange={(e) => setCalcCategory(e.target.value)}
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {calcRows.rows.map((r, i) => (
-                <tr key={`${r.label}-${r.grade}-${i}`}>
-                  <td>{r.label}</td>
-                  <td className="center">
-                    {r.grade}{" "}
-                    <span className="admin-sub">({r.ratio}%)</span>
-                  </td>
-                  <td className="center">
-                    {r.amount.toLocaleString("ko-KR")}만
-                  </td>
-                  {r.error ? (
-                    <td colSpan={5} className="center admin-sub">
-                      {r.error}
-                    </td>
-                  ) : (
-                    <>
-                      <td className="center" style={{ fontWeight: 600 }}>
-                        {r.days}일{" "}
-                        <span
-                          style={{ color: "var(--text-muted)", fontSize: 11 }}
-                        >
-                          ({r.hours}h)
-                        </span>
-                      </td>
-                      {STAGES.map((s) => {
-                        const st = r.stages?.[s];
-                        return (
-                          <td className="center" key={s}>
-                            {st ? (
-                              <>
-                                {st.days}일{" "}
-                                <span
-                                  style={{
-                                    color: "var(--text-muted)",
-                                    fontSize: 10.5,
-                                  }}
-                                >
-                                  ({st.hours}h)
-                                </span>
-                                <div
-                                  className="admin-sub"
-                                  style={{ fontSize: 10, marginTop: 2 }}
-                                >
-                                  {st.ratio}%
-                                </div>
-                              </>
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-                        );
-                      })}
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </select>
+            </label>
+            <label className="estimate-field">
+              <span>견적 (만원)</span>
+              <input
+                type="number"
+                placeholder="예: 500"
+                value={calcBudget}
+                onChange={(e) => setCalcBudget(e.target.value)}
+              />
+            </label>
+          </div>
 
-      <div className="admin-page-section">
-        <h4>등록 견적 샘플</h4>
-        <table className="agg">
-          <thead>
-            <tr>
-              <th>업체</th>
-              <th>프로젝트</th>
-              <th className="center">견적</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(data.estimates)
-              .slice(0, 40)
-              .map(([k, amount]) => {
-                const [company, project] = k.split("|||");
-                return (
-                  <tr key={k}>
-                    <td>{company}</td>
-                    <td>{project}</td>
-                    <td className="center">{fmWon(amount)}</td>
+          <div className={"estimate-panels" + (isSplit ? " split" : "")}>
+            {isSplit ? (
+              <>
+                <GradeControls
+                  label="디자인 몫"
+                  tone="design"
+                  state={designGrade}
+                  onChange={setDesignGrade}
+                />
+                <GradeControls
+                  label="퍼블 몫"
+                  tone="publish"
+                  state={publishGrade}
+                  onChange={setPublishGrade}
+                />
+              </>
+            ) : (
+              <GradeControls
+                label="담당 직급"
+                tone="single"
+                state={singleGrade}
+                onChange={setSingleGrade}
+              />
+            )}
+          </div>
+
+          <div className="estimate-summary">
+            <div className="estimate-summary-item">
+              <span className="estimate-summary-label">기준 시급 환산</span>
+              <strong>
+                {hours != null ? `${hours}h` : "데이터 부족"}
+                {hours != null && (
+                  <span className="estimate-summary-sub">
+                    {" "}
+                    · 약 {round1(hours / 8)}일
+                  </span>
+                )}
+              </strong>
+            </div>
+            {calcRows.note ? (
+              <p className="estimate-summary-note">{calcRows.note}</p>
+            ) : null}
+          </div>
+
+          {calcRows.rows.length > 0 && (
+            <div className="estimate-result-wrap">
+              <table className="agg estimate-result-table">
+                <thead>
+                  <tr>
+                    <th className="left">분야</th>
+                    <th className="center">담당</th>
+                    <th className="center">견적</th>
+                    <th className="center">작업일수</th>
+                    {STAGES.map((s) => (
+                      <th className="center" key={s}>
+                        {s}
+                      </th>
+                    ))}
                   </tr>
-                );
-              })}
-          </tbody>
-        </table>
+                </thead>
+                <tbody>
+                  {calcRows.rows.map((r, i) => {
+                    return (
+                      <tr key={`${r.label}-${r.grade}-${i}`}>
+                        <td className="left">{r.label}</td>
+                        <td className="center">
+                          <span className="estimate-result-grade">{r.grade}</span>
+                          <span className="estimate-result-pct">{r.ratio}%</span>
+                        </td>
+                        <td className="center mono">
+                          {r.amount.toLocaleString("ko-KR")}만
+                        </td>
+                        {r.error ? (
+                          <td colSpan={5} className="center admin-sub">
+                            {r.error}
+                          </td>
+                        ) : (
+                          <>
+                            <td className="center">
+                              <div className="estimate-result-days">
+                                <b>{r.days}일</b>
+                                <span>{r.hours}h</span>
+                              </div>
+                            </td>
+                            {STAGES.map((s) => {
+                              const st = r.stages?.[s];
+                              return (
+                                <td className="center" key={s}>
+                                  {st ? (
+                                    <div className="estimate-stage-cell">
+                                      <b>{st.days}일</b>
+                                      <span>{st.hours}h</span>
+                                      <em>{st.ratio}%</em>
+                                    </div>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

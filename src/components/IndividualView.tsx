@@ -34,6 +34,12 @@ export function IndividualView({ name }: { name: string }) {
     replaceFromBackup,
   } = useJobsheet();
 
+  const activeEmployeeNames = useMemo(
+    () =>
+      allEmployeeNames.filter((n) => !data.formerEmployees.includes(n)),
+    [allEmployeeNames, data.formerEmployees]
+  );
+
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -305,7 +311,7 @@ export function IndividualView({ name }: { name: string }) {
                 router.push(`/e/${encodeURIComponent(e.target.value)}`)
               }
             >
-              {allEmployeeNames.map((n) => (
+              {activeEmployeeNames.map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>

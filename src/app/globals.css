@@ -71,6 +71,8 @@
   .back-btn { font-family: inherit; font-size: 12px; color: var(--text-secondary); background: none;
     border: 0.5px solid var(--border-strong); border-radius: 8px; padding: 6px 12px; cursor: pointer; margin-right: 10px; }
   .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .back-btn-group { display: flex; align-items: center; gap: 6px; }
+  .back-btn-group .back-btn { margin-right: 0; }
   .topbar .who { justify-self: start; }
   .topbar .monthnav { justify-self: center; }
   .topbar-right { justify-self: end; display: flex; align-items: center; gap: 18px; }
@@ -79,7 +81,7 @@
     display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
   .who .name { font-weight: 700; font-size: 15px; margin: 0; }
   .who .role { font-size: 12px; color: var(--text-muted); margin: 0; }
-  .employee-select { font-family: inherit; font-weight: 700; font-size: 15px; border: none; background: none;
+  .employee-select { font-family: inherit; font-weight: 700; font-size: 13px; border: none; background: none;
     color: var(--text); padding: 0; cursor: pointer; }
   .employee-select:focus { outline: none; }
 
@@ -227,7 +229,12 @@
   .save-msg.show { opacity: 1; }
   .save-msg.error { color: #b3543c; }
   .save-msg.warn { color: #9a6b2f; }
-  .stage-rule-warn { font-size: 11px; color: #b3543c; margin-top: 3px; }
+  .leave-window-note { color: #9a6b2f; font-weight: 600; }
+  .leave-day-blocked {
+    margin: 12px 0 4px; padding: 16px 14px; border-radius: 10px;
+    background: #f7f5f1; border: 0.5px solid var(--border);
+    font-size: 13px; color: var(--text-secondary); line-height: 1.5; text-align: center;
+  }
   .company-ac-wrap { position: relative; flex: 1; min-width: 0; }
   .company-ac-wrap .company { width: 100%; }
   .company-autocomplete {
@@ -237,10 +244,113 @@
   }
   .company-autocomplete-item { padding: 7px 10px; cursor: pointer; font-size: 13px; }
   .company-autocomplete-item:hover { background: var(--accent-bg, #eef3ee); }
-  .team-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
+  .team-filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
   .team-filters select { min-width: 140px; }
+  .team-kpi-head { margin-bottom: 14px; }
+  .team-toolbar {
+    background: var(--card); border: 0.5px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; margin: 0 auto 16px; max-width: 1600px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .team-toolbar-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .team-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .team-tab-count { margin-left: 6px; opacity: 0.7; font-weight: 500; }
+  .team-export-bar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 6px 8px; border-radius: 10px; background: var(--bg);
+    border: 0.5px solid var(--border);
+  }
+  .team-export-label {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    margin-right: 2px;
+  }
+  .team-export-bar select {
+    font-family: inherit; font-size: 12.5px; border: 0.5px solid var(--border-strong);
+    border-radius: 8px; padding: 6px 8px; background: #fff; min-width: 118px;
+  }
+  .team-export-tilde { color: var(--text-muted); padding: 0 2px; }
+  .team-filter-field { display: flex; flex-direction: column; gap: 4px; }
+  .team-filter-field > span { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+  .team-filter-field select {
+    font-family: inherit; font-size: 12.5px; border: 0.5px solid var(--border-strong);
+    border-radius: 8px; padding: 7px 10px; background: #fff; min-width: 140px;
+  }
+  @media (max-width: 900px) {
+    .team-toolbar-row { align-items: stretch; }
+    .team-export-bar { width: 100%; }
+  }
   .estimate-grade-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
   .estimate-grade-row label { font-size: 12px; color: var(--text-muted); }
+
+  .estimate-calc-layout { display: flex; flex-direction: column; gap: 16px; }
+  .estimate-calc-inputs {
+    display: grid; grid-template-columns: minmax(160px, 220px) minmax(140px, 180px);
+    gap: 12px; align-items: end;
+  }
+  .estimate-field { display: flex; flex-direction: column; gap: 6px; }
+  .estimate-field > span { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+  .estimate-field select,
+  .estimate-field input {
+    font-family: inherit; font-size: 13px; border: 0.5px solid var(--border-strong);
+    border-radius: 8px; padding: 8px 10px; background: #fff; color: var(--text);
+  }
+  .estimate-panels { display: grid; gap: 12px; }
+  .estimate-panels.split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .estimate-panel {
+    border: 0.5px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #fafaf8;
+  }
+  .estimate-panel.tone-design { background: #f4f8f4; border-color: #d7e5d7; }
+  .estimate-panel.tone-publish { background: #f3f5fa; border-color: #d5dce8; }
+  .estimate-panel.tone-single { background: #f7f5f1; }
+  .estimate-panel-head { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text); }
+  .estimate-slots { display: flex; flex-direction: column; gap: 8px; }
+  .estimate-slot {
+    display: grid; grid-template-columns: 52px minmax(0, 1fr) 88px;
+    gap: 8px; align-items: center;
+  }
+  .estimate-slot-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .estimate-slot select,
+  .estimate-slot-ratio input {
+    font-family: inherit; font-size: 12.5px; border: 0.5px solid var(--border);
+    border-radius: 7px; padding: 6px 8px; background: #fff; width: 100%;
+  }
+  .estimate-slot-ratio { display: flex; align-items: center; gap: 4px; }
+  .estimate-slot-ratio span,
+  .estimate-slot-ratio-fixed { font-size: 12px; color: var(--text-muted); }
+  .estimate-slot-ratio-fixed { text-align: center; }
+  .estimate-summary {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 12px 14px; border-radius: 10px; background: var(--bg); border: 0.5px solid var(--border);
+  }
+  .estimate-summary-item { display: flex; align-items: baseline; gap: 10px; }
+  .estimate-summary-label { font-size: 12px; color: var(--text-muted); }
+  .estimate-summary-item strong { font-size: 15px; }
+  .estimate-summary-sub { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+  .estimate-summary-note { margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.45; }
+  .estimate-result-wrap { overflow-x: auto; }
+  .estimate-result-table td { vertical-align: top; }
+  .estimate-result-table td.left { text-align: left !important; }
+  .estimate-result-grade { font-weight: 600; margin-right: 4px; }
+  .estimate-result-pct { font-size: 11px; color: var(--text-muted); }
+  .estimate-result-days,
+  .estimate-stage-cell {
+    display: flex; flex-direction: column; gap: 2px; align-items: center;
+    line-height: 1.25; min-height: 0;
+  }
+  .estimate-result-days b,
+  .estimate-stage-cell b { font-weight: 700; font-size: 12.5px; }
+  .estimate-result-days span,
+  .estimate-stage-cell span { font-size: 11px; color: var(--text-muted); }
+  .estimate-stage-cell em {
+    font-style: normal; font-size: 10px; color: var(--text-muted);
+  }
+  @media (max-width: 900px) {
+    .estimate-panels.split { grid-template-columns: 1fr; }
+    .estimate-calc-inputs { grid-template-columns: 1fr 1fr; }
+  }
   .modal-save { font-family: inherit; font-size: 13.5px; font-weight: 700; padding: 9px 22px; border-radius: 8px;
     border: none; background: var(--accent); color: #fff; cursor: pointer; }
   .modal-save:hover { opacity: 0.92; }
@@ -266,7 +376,28 @@
     background: var(--card); border: 0.5px solid var(--border); border-radius: 14px;
     padding: 20px 24px; margin: 0 auto 16px; max-width: 1600px;
   }
+  .admin-reg-panel {
+    border: 0.5px solid var(--border); border-radius: 12px; padding: 14px 16px;
+    background: #f7f5f1; margin-bottom: 18px;
+  }
+  .admin-reg-panel-head {
+    font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text);
+  }
+  .admin-reg-fields {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) minmax(120px, 160px) auto;
+    gap: 12px; align-items: end;
+  }
+  .admin-reg-submit { height: 36px; align-self: end; }
+  .admin-reg-hint {
+    margin: 10px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.4;
+  }
+  @media (max-width: 700px) {
+    .admin-reg-fields { grid-template-columns: 1fr 1fr; }
+    .admin-reg-submit { grid-column: 1 / -1; }
+  }
   .admin-page-section h4 { font-size: 14px; margin: 0 0 12px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .admin-h4-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
   .admin-count-pill { font-size: 11px; font-weight: 500; color: var(--text-muted); background: var(--bg);
     border-radius: 10px; padding: 2px 10px; }
   .team-tab-btn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 20px; border-radius: 8px;
@@ -276,6 +407,27 @@
   .role-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 6px; margin-right: 4px; vertical-align: middle; }
   .role-badge.role-디자인 { background: var(--accent-bg); color: var(--accent); }
   .role-badge.role-퍼블 { background: #eef1f7; color: #4a5a7a; }
+  .role-badge.role-전체 { background: #f0eeea; color: #5c574e; }
+
+  table.agg tr.stage-ratio-design td {
+    background: #f4f8f4;
+  }
+  table.agg tr.stage-ratio-publish td {
+    background: #f3f5fa;
+  }
+  table.agg td.stage-ratio-child-cat {
+    border-left: 3px solid var(--border-strong);
+    padding-left: 16px;
+  }
+  .stage-ratio-toggle-col { width: 110px; white-space: nowrap; }
+  .stage-ratio-toggle {
+    font-family: inherit; font-size: 11px; font-weight: 600;
+    border: 0.5px solid var(--border-strong); background: #fff;
+    color: var(--text-secondary); border-radius: 6px;
+    padding: 3px 8px; cursor: pointer;
+  }
+  .stage-ratio-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+  .stage-ratio-toggle.open { background: var(--accent-bg); color: var(--accent); border-color: transparent; }
   .contrib-time-line { font-size: 12px; color: var(--text-secondary); }
   .admin-list-wrap { margin-top: 12px; border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden; }
   .admin-list-table { margin-top: 0; table-layout: fixed; width: 100%; }
@@ -491,6 +643,19 @@
   .projects-toolbar-hint {
     margin: 0 0 14px; font-size: 11.5px; color: var(--text-muted);
     line-height: 1.4;
+  }
+  /* 개인 전체프로젝트: 업체~작업항목 좌측, 견적 우측, 나머지 가운데 */
+  .projects-toolbar-section table.projects-agg-table th.left,
+  .projects-toolbar-section table.projects-agg-table td.left {
+    text-align: left;
+  }
+  .projects-toolbar-section table.projects-agg-table th.right,
+  .projects-toolbar-section table.projects-agg-table td.right {
+    text-align: right;
+  }
+  .projects-toolbar-section table.projects-agg-table th.center,
+  .projects-toolbar-section table.projects-agg-table td.center {
+    text-align: center;
   }
 
   .dot2 { display: inline-block; width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.06); }

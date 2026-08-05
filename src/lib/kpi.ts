@@ -113,9 +113,8 @@ export function computeCategoryBaseline(
   for (const cat in byCategory) {
     const list = byCategory[cat].slice().sort((a, b) => a.perHour - b.perHour);
     const n = list.length;
-    const trimCount = Math.floor(n * 0.1);
-    const trimmed =
-      n - trimCount * 2 >= 1 ? list.slice(trimCount, n - trimCount) : list;
+    // 최솟값·최댓값을 제외한 평균으로 기준 시급을 잡는다 (표본 3개 이상일 때)
+    const trimmed = n >= 3 ? list.slice(1, n - 1) : list;
     const avg = trimmed.reduce((s, x) => s + x.perHour, 0) / trimmed.length;
     result[cat] = {
       count: n,
@@ -173,22 +172,37 @@ export function computeStageRatioByCategory(
   entries: WorkEntry[],
   projectStatus: Record<string, string>,
   leaveData: Record<string, string>,
-  category: string
+  category: string,
+  staffRole?: Record<string, string>,
+  roleFilter?: "디자인" | "퍼블"
 ) {
   const stages = { 시안: 0, 본작업: 0, 수정중: 0, 제작중: 0 };
   let total = 0;
+  const projectKeys = new Set<string>();
   entries.forEach((e) => {
     if (!e.company || e.project !== category) return;
     const key = projectKey(e.company, e.project);
     if ((projectStatus[key] || "진행중") !== "완료") return;
+    if (roleFilter && staffRole) {
+      const role = classifyDesignOrPublish(
+        e.owner || "",
+        e.note,
+        e.stage,
+        staffRole
+      );
+      if (role !== roleFilter) return;
+    }
     const leave = leaveData[`${e.owner}|||${e.date}`] || "";
     const dur = computeDuration(e.start, e.end, leave);
     if (e.stage in stages) {
       (stages as Record<string, number>)[e.stage] += dur;
       total += dur;
+      projectKeys.add(key);
     }
   });
-  if (total <= 0) return { stages, total: 0, ratios: stages };
+  if (total <= 0) {
+    return { stages, total: 0, ratios: stages, sampleCount: 0 };
+  }
   const ratios = {
     시안: round1((stages.시안 / total) * 100),
     본작업: round1((stages.본작업 / total) * 100),
@@ -204,5 +218,6 @@ export function computeStageRatioByCategory(
     },
     total: round1(total),
     ratios,
+    sampleCount: projectKeys.size,
   };
 }

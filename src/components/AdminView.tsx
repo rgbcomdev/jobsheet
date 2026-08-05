@@ -23,6 +23,7 @@ export function AdminView() {
   const router = useRouter();
 
   const [showFormer, setShowFormer] = useState(false);
+  const [showEmpReg, setShowEmpReg] = useState(false);
   const [regName, setRegName] = useState("");
   const [regTeam, setRegTeam] = useState("디자인");
   const [editName, setEditName] = useState<string | null>(null);
@@ -48,6 +49,7 @@ export function AdminView() {
   } | null>(null);
   const [assigneePick, setAssigneePick] = useState("");
   const [restoring, setRestoring] = useState(false);
+  const [showCompanyList, setShowCompanyList] = useState(false);
 
   const employeesByTeam = useMemo(() => {
     const out: Record<
@@ -219,47 +221,67 @@ export function AdminView() {
           <span className="admin-count-pill">
             <span>{employeeCount}</span>명
           </span>
+          <div className="admin-h4-actions">
+            <button
+              type="button"
+              className={"backup-btn" + (showFormer ? " active" : "")}
+              onClick={() => setShowFormer((v) => !v)}
+            >
+              {showFormer ? "퇴사자 숨기기" : "퇴사자 보기"}
+            </button>
+            <button
+              type="button"
+              className={"backup-btn" + (showEmpReg ? " active" : "")}
+              onClick={() => setShowEmpReg((v) => !v)}
+            >
+              {showEmpReg ? "등록 닫기" : "신규 등록"}
+            </button>
+          </div>
         </h4>
-        <p className="admin-sub">+ 신규 직원 등록</p>
-        <div className="reg-row">
-          <input
-            placeholder="이름"
-            value={regName}
-            onChange={(e) => setRegName(e.target.value)}
-          />
-          <select value={regTeam} onChange={(e) => setRegTeam(e.target.value)}>
-            <option value="디자인">디자인팀</option>
-            <option value="영상">영상팀</option>
-          </select>
-          <button
-            type="button"
-            className="backup-btn"
-            onClick={async () => {
-              if (!regName.trim()) return;
-              await upsertEmployee({
-                name: regName.trim(),
-                team: regTeam,
-                grade: "사원",
-              });
-              setRegName("");
-            }}
-          >
-            확정
-          </button>
-        </div>
-        <div className="reg-row" style={{ marginTop: 14 }}>
-          <button
-            type="button"
-            className={"backup-btn" + (showFormer ? " active" : "")}
-            id="toggleFormerBtn"
-            onClick={() => setShowFormer((v) => !v)}
-          >
-            퇴사자 보기
-          </button>
-        </div>
-        <p className="admin-sub" style={{ marginTop: 12 }}>
-          ⋮⋮ 핸들을 드래그해 팀 내 순서를 바꿀 수 있습니다. (대시보드 카드
-          순서에 반영)
+
+        {showEmpReg && (
+          <div className="admin-reg-panel">
+            <div className="admin-reg-panel-head">신규 직원 등록</div>
+            <div className="admin-reg-fields">
+              <label className="estimate-field">
+                <span>이름</span>
+                <input
+                  placeholder="이름 입력"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                />
+              </label>
+              <label className="estimate-field">
+                <span>팀</span>
+                <select
+                  value={regTeam}
+                  onChange={(e) => setRegTeam(e.target.value)}
+                >
+                  <option value="디자인">디자인팀</option>
+                  <option value="영상">영상팀</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="backup-btn admin-reg-submit"
+                onClick={async () => {
+                  if (!regName.trim()) return;
+                  await upsertEmployee({
+                    name: regName.trim(),
+                    team: regTeam,
+                    grade: "사원",
+                  });
+                  setRegName("");
+                }}
+              >
+                등록
+              </button>
+            </div>
+          </div>
+        )}
+        <p className="admin-reg-hint" style={{ marginTop: 0, marginBottom: 14 }}>
+          ⋮⋮ 핸들을 드래그하면 팀 내 순서가 바뀌고, 대시보드 카드 순서에도
+          반영됩니다.
         </p>
         {Object.entries(employeesByTeam).map(([team, rows]) => {
           if (!rows.length) return null;
@@ -332,7 +354,7 @@ export function AdminView() {
                             href={`/e/${encodeURIComponent(r.name)}`}
                             className="edit-row-btn"
                           >
-                            KPI 보기
+                            캘린더 보기
                           </Link>
                         </td>
                         <td>
@@ -380,6 +402,14 @@ export function AdminView() {
           <span className="admin-count-pill">
             {Object.keys(data.companyCat).length}곳
           </span>
+          <button
+            type="button"
+            className={"backup-btn" + (showCompanyList ? " active" : "")}
+            style={{ marginLeft: "auto" }}
+            onClick={() => setShowCompanyList((v) => !v)}
+          >
+            {showCompanyList ? "목록 숨기기" : "목록 보기"}
+          </button>
         </h4>
         <p className="admin-sub">+ 신규 업체 등록</p>
         <div className="reg-row">
@@ -451,32 +481,34 @@ export function AdminView() {
             확정
           </button>
         </div>
-        <div className="admin-list-wrap" style={{ marginTop: 16 }}>
-          <table className="agg admin-list-table">
-            <thead>
-              <tr>
-                <th className="col-name">업체</th>
-                <th>대분류</th>
-                <th>카테고리</th>
-                <th>담당</th>
-                <th>작업항목</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(data.companyCat)
-                .sort(([a], [b]) => a.localeCompare(b, "ko"))
-                .map(([name, info]) => (
-                  <tr key={name}>
-                    <td className="col-name">{name}</td>
-                    <td>{info.major || "-"}</td>
-                    <td>{info.cat || "-"}</td>
-                    <td>{info.assignee || "-"}</td>
-                    <td>{info.task || "-"}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+        {showCompanyList && (
+          <div className="admin-list-wrap" style={{ marginTop: 16 }}>
+            <table className="agg admin-list-table">
+              <thead>
+                <tr>
+                  <th className="col-name">업체</th>
+                  <th>대분류</th>
+                  <th>카테고리</th>
+                  <th>담당</th>
+                  <th>작업항목</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(data.companyCat)
+                  .sort(([a], [b]) => a.localeCompare(b, "ko"))
+                  .map(([name, info]) => (
+                    <tr key={name}>
+                      <td className="col-name">{name}</td>
+                      <td>{info.major || "-"}</td>
+                      <td>{info.cat || "-"}</td>
+                      <td>{info.assignee || "-"}</td>
+                      <td>{info.task || "-"}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {editName && (

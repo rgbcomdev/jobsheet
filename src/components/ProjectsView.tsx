@@ -251,9 +251,9 @@ export function ProjectsView({ name }: { name: string }) {
             title="클릭하면 마지막 진행달로 이동합니다"
             onClick={() => jumpToDate(br.lastDate || g.lastDate)}
           >
-            <td className="company">{isFirst ? g.company : ""}</td>
-            <td className="center">{isFirst ? majorLabel : ""}</td>
-            <td className="center">{isFirst ? catInfo.sub || g.project : ""}</td>
+            <td className="left company">{isFirst ? g.company : ""}</td>
+            <td className="left">{isFirst ? majorLabel : ""}</td>
+            <td className="left">{isFirst ? catInfo.sub || g.project : ""}</td>
             <td className="left">
               {showRole && (
                 <span className={`role-badge role-${block.role}`}>
@@ -262,7 +262,7 @@ export function ProjectsView({ name }: { name: string }) {
               )}
               {br.task}
             </td>
-            <td className="center">{idx === 0 ? est : ""}</td>
+            <td className="right">{idx === 0 ? est : ""}</td>
             {STAGES.map((s) => (
               <td className="center mono" key={s}>
                 {fmtHours(br.hours[s] || 0)}
@@ -398,14 +398,14 @@ export function ProjectsView({ name }: { name: string }) {
           진행달로 이동
         </p>
 
-        <table className="agg">
+        <table className="agg projects-agg-table">
           <thead>
             <tr>
-              <th>업체명</th>
-              <th className="center">대분류</th>
-              <th className="center">세부</th>
-              <th>작업항목</th>
-              <th className="center">견적</th>
+              <th className="left">업체명</th>
+              <th className="left">대분류</th>
+              <th className="left">세부</th>
+              <th className="left">작업항목</th>
+              <th className="right">견적</th>
               {STAGES.map((s) => (
                 <th className="center" key={s}>
                   {s}
