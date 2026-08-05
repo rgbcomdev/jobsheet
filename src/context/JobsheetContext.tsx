@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import type { CompanyInfo, JobsheetSeed, WorkEntry } from "@/lib/types";
 import { loadJobsheetData } from "@/lib/data/load";
+import { restoreBackupToSupabase } from "@/lib/data/restore";
 import { GRADE_ORDER, leaveKey, projectKey } from "@/lib/constants";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -42,7 +43,7 @@ type Ctx = {
   upsertCompany: (name: string, info: CompanyInfo) => Promise<void>;
   deleteCompany: (name: string) => Promise<void>;
   reorderEmployees: (team: string, orderedNames: string[]) => Promise<void>;
-  replaceFromBackup: (partial: Partial<JobsheetSeed>) => void;
+  replaceFromBackup: (partial: Partial<JobsheetSeed>) => Promise<void>;
   activeEmployeesByTeam: Record<string, string[]>;
   allEmployeeNames: string[];
   sortByGradeDesc: (names: string[]) => string[];
@@ -444,15 +445,41 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
     if (sb) await sb.from("companies").delete().eq("name", name);
   }, []);
 
-  const replaceFromBackup = useCallback((partial: Partial<JobsheetSeed>) => {
-    setData((prev) => ({
-      ...prev,
-      ...partial,
-      entries: partial.entries || prev.entries,
-      projectStatus: partial.projectStatus || {},
-      leaveData: partial.leaveData || {},
-      version: 2,
-    }));
+  const replaceFromBackup = useCallback(async (partial: Partial<JobsheetSeed>) => {
+    let next: JobsheetSeed | null = null;
+    setData((prev) => {
+      next = {
+        ...prev,
+        version: 2,
+        entries: partial.entries || [],
+        projectStatus: partial.projectStatus || {},
+        leaveData: partial.leaveData || {},
+        publicDutyData: partial.publicDutyData ?? prev.publicDutyData,
+        employees: partial.employees ?? prev.employees,
+        staffGrade: partial.staffGrade ?? prev.staffGrade,
+        formerEmployees: partial.formerEmployees ?? prev.formerEmployees,
+        gradeDailyRate: partial.gradeDailyRate ?? prev.gradeDailyRate,
+        staffDailyRateOverride:
+          partial.staffDailyRateOverride ?? prev.staffDailyRateOverride,
+        staffRole: partial.staffRole ?? prev.staffRole,
+        holidays: partial.holidays ?? prev.holidays,
+        companyCat: partial.companyCat ?? prev.companyCat,
+        companyMaster: partial.companyMaster ?? prev.companyMaster,
+        taskItemOverrides: partial.taskItemOverrides ?? prev.taskItemOverrides,
+        estimates: partial.estimates ?? prev.estimates,
+        personEstimates: partial.personEstimates ?? prev.personEstimates,
+        fixedEstimateSplitRatio:
+          partial.fixedEstimateSplitRatio ?? prev.fixedEstimateSplitRatio,
+        projectTypesByMajor:
+          partial.projectTypesByMajor ?? prev.projectTypesByMajor,
+        exportedAt: partial.exportedAt ?? prev.exportedAt,
+      };
+      return next;
+    });
+    const sb = getSupabase();
+    if (sb && next) {
+      await restoreBackupToSupabase(sb, next);
+    }
   }, []);
 
   const sortByGradeDesc = useCallback(

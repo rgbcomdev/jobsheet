@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useJobsheet } from "@/context/JobsheetContext";
 import {
   buildGroups,
@@ -9,28 +10,39 @@ import {
   getDefaultYearMonth,
 } from "@/lib/aggregate";
 import { classifyDesignOrPublish, computeDuration, round1 } from "@/lib/time";
-import { STAGES } from "@/lib/constants";
+import {
+  DEFAULT_PROJECT_TYPES_BY_MAJOR,
+  STAGES,
+} from "@/lib/constants";
 import { fmWon } from "@/lib/estimate";
 
 type TeamTab = "전체" | "디자인" | "동영상";
 
 export function TeamKpiView() {
-  const { loading, data, getStatus, setStatus } = useJobsheet();
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const { loading, data, getStatus, setStatus, activeEmployeesByTeam } =
+    useJobsheet();
+  const router = useRouter();
   const [monthSynced, setMonthSynced] = useState(false);
   const [tab, setTab] = useState<TeamTab>("전체");
+  const [monthFilter, setMonthFilter] = useState<string>("");
+  const [projectFilter, setProjectFilter] = useState("전체");
+  const [employeeFilter, setEmployeeFilter] = useState("전체");
 
   useEffect(() => {
     if (loading || monthSynced) return;
     const { year: y, month: m } = getDefaultYearMonth(data.entries);
-    setYear(y);
-    setMonth(m);
+    setMonthFilter(`${y}-${String(m).padStart(2, "0")}`);
     setMonthSynced(true);
   }, [loading, data.entries, monthSynced]);
 
-  const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+  const allMonths = useMemo(() => {
+    return [...new Set(data.entries.map((e) => e.date.slice(0, 7)))]
+      .filter(Boolean)
+      .sort()
+      .reverse();
+  }, [data.entries]);
+
+  const monthPrefix = monthFilter === "전체" || !monthFilter ? null : monthFilter;
 
   const groups = useMemo(
     () =>
@@ -44,6 +56,35 @@ export function TeamKpiView() {
     [data.entries, data.leaveData, data.companyCat, monthPrefix]
   );
 
+  const projectOptions = useMemo(() => {
+    if (tab === "전체") {
+      const all = new Set<string>();
+      Object.values(
+        data.projectTypesByMajor || DEFAULT_PROJECT_TYPES_BY_MAJOR
+      ).forEach((list) => list.forEach((c) => all.add(c)));
+      return [...all].filter((c) => c !== "RGB내부업무");
+    }
+    const list =
+      data.projectTypesByMajor?.[tab] ||
+      DEFAULT_PROJECT_TYPES_BY_MAJOR[tab] ||
+      [];
+    return list.filter((c) => c !== "RGB내부업무");
+  }, [tab, data.projectTypesByMajor]);
+
+  const employeeOptions = useMemo(() => {
+    if (tab === "디자인") return activeEmployeesByTeam["디자인"] || [];
+    if (tab === "동영상") return activeEmployeesByTeam["영상"] || [];
+    return [
+      ...(activeEmployeesByTeam["디자인"] || []),
+      ...(activeEmployeesByTeam["영상"] || []),
+    ];
+  }, [tab, activeEmployeesByTeam]);
+
+  useEffect(() => {
+    setProjectFilter("전체");
+    setEmployeeFilter("전체");
+  }, [tab]);
+
   const filteredKeys = useMemo(() => {
     return Object.keys(groups)
       .filter((k) => {
@@ -54,10 +95,21 @@ export function TeamKpiView() {
           data.companyCat,
           data.projectTypesByMajor
         );
-        if (tab === "전체") return true;
-        // 원본과 동일: RGB내부업무는 팀 구분 없이 각 팀 탭에도 포함
-        if (g.project === "RGB내부업무") return true;
-        return major === tab;
+        if (tab !== "전체") {
+          if (g.project !== "RGB내부업무" && major !== tab) return false;
+        }
+        if (projectFilter !== "전체" && g.project !== projectFilter) return false;
+        if (employeeFilter !== "전체") {
+          const worked = data.entries.some(
+            (e) =>
+              e.company === g.company &&
+              e.project === g.project &&
+              e.owner === employeeFilter &&
+              (!monthPrefix || e.date.startsWith(monthPrefix))
+          );
+          if (!worked) return false;
+        }
+        return true;
       })
       .sort((a, b) => {
         const ga = groups[a];
@@ -79,7 +131,16 @@ export function TeamKpiView() {
         }
         return gb.total - ga.total;
       });
-  }, [groups, tab, data.companyCat, data.projectTypesByMajor]);
+  }, [
+    groups,
+    tab,
+    projectFilter,
+    employeeFilter,
+    monthPrefix,
+    data.companyCat,
+    data.projectTypesByMajor,
+    data.entries,
+  ]);
 
   const counts = useMemo(() => {
     let all = 0;
@@ -107,19 +168,17 @@ export function TeamKpiView() {
     );
   }
 
-  const changeMonth = (delta: number) => {
-    let m = month + delta;
-    let y = year;
-    if (m > 12) {
-      m = 1;
-      y++;
-    }
-    if (m < 1) {
-      m = 12;
-      y--;
-    }
-    setMonth(m);
-    setYear(y);
+  const goToPerson = (name: string, company: string, project: string) => {
+    const personEntries = data.entries.filter(
+      (e) =>
+        e.owner === name && e.company === company && e.project === project
+    );
+    let lastDate: string | null = null;
+    personEntries.forEach((e) => {
+      if (!lastDate || e.date > lastDate) lastDate = e.date;
+    });
+    const q = lastDate ? `?date=${lastDate}` : "";
+    router.push(`/e/${encodeURIComponent(name)}${q}`);
   };
 
   const tabs: { key: TeamTab; label: string; count: number }[] = [
@@ -135,20 +194,10 @@ export function TeamKpiView() {
           ← 통합관리
         </Link>
         <h1>전체 직원 통합 보기 (KPI)</h1>
-        <div className="monthnav">
-          <button type="button" onClick={() => changeMonth(-1)}>
-            ‹
-          </button>
-          <span className="label">
-            {year}년 {month}월
-          </span>
-          <button type="button" onClick={() => changeMonth(1)}>
-            ›
-          </button>
-        </div>
+        <div />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -162,6 +211,48 @@ export function TeamKpiView() {
             </span>
           </button>
         ))}
+      </div>
+
+      <div className="team-filters">
+        <select
+          value={monthFilter || "전체"}
+          onChange={(e) => setMonthFilter(e.target.value)}
+        >
+          <option value="전체">전체 기간</option>
+          {allMonths.map((m) => (
+            <option key={m} value={m}>
+              {m.replace("-", "년 ")}월
+            </option>
+          ))}
+        </select>
+        <select
+          value={projectFilter}
+          onChange={(e) => setProjectFilter(e.target.value)}
+        >
+          <option value="전체">
+            {tab === "디자인"
+              ? "디자인 전체"
+              : tab === "동영상"
+                ? "영상 전체"
+                : "프로젝트 전체"}
+          </option>
+          {projectOptions.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        <select
+          value={employeeFilter}
+          onChange={(e) => setEmployeeFilter(e.target.value)}
+        >
+          <option value="전체">담당자 전체</option>
+          {employeeOptions.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="team-full-table-wrap">
@@ -228,7 +319,9 @@ export function TeamKpiView() {
               };
               data.entries.forEach((e) => {
                 if (e.company !== g.company || e.project !== g.project) return;
-                if (!e.date.startsWith(monthPrefix)) return;
+                if (monthPrefix && !e.date.startsWith(monthPrefix)) return;
+                if (employeeFilter !== "전체" && e.owner !== employeeFilter)
+                  return;
                 const role = classifyDesignOrPublish(
                   e.owner,
                   e.note,
@@ -244,13 +337,16 @@ export function TeamKpiView() {
                 }
               });
 
-              const estimate = data.estimates[`${g.company}|||${g.project}`];
+              const estimate =
+                data.personEstimates && employeeFilter !== "전체"
+                  ? data.personEstimates[
+                      `${g.company}|||${g.project}|||${employeeFilter}`
+                    ] ?? data.estimates[`${g.company}|||${g.project}`]
+                  : data.estimates[`${g.company}|||${g.project}`];
               const roles = (["디자인", "퍼블"] as const).filter(
                 (r) => byRole[r].hours > 0
               );
-              if (!roles.length) {
-                roles.push("디자인");
-              }
+              if (!roles.length) roles.push("디자인");
 
               return roles.map((role, idx) => (
                 <tr key={key + role} className={done ? "done" : ""}>
@@ -266,7 +362,30 @@ export function TeamKpiView() {
                   <td>
                     <span className={`role-badge role-${role}`}>{role}</span>
                   </td>
-                  <td>{[...byRole[role].owners].join(", ") || "-"}</td>
+                  <td>
+                    {[...byRole[role].owners].map((name, i) => (
+                      <span key={name}>
+                        {i > 0 ? ", " : ""}
+                        <button
+                          type="button"
+                          className="linkish"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--accent)",
+                            cursor: "pointer",
+                            padding: 0,
+                            font: "inherit",
+                          }}
+                          onClick={() =>
+                            goToPerson(name, g.company, g.project)
+                          }
+                        >
+                          {name}
+                        </button>
+                      </span>
+                    )) || "-"}
+                  </td>
                   {STAGES.map((s) => (
                     <td className="center mono" key={s}>
                       {byRole[role].stages[s]

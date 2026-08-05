@@ -79,6 +79,25 @@ export const DEFAULT_GRADE_DAILY_RATE: Record<string, number> = {
   사원: 35,
 };
 
+/** 홈페이지·전자카탈로그 견적 디자인/퍼블 고정 배분 */
+export const FIXED_ESTIMATE_SPLIT_RATIO: Record<
+  string,
+  { designPct: number; publishPct: number }
+> = {
+  홈페이지: { designPct: 70, publishPct: 30 },
+  전자카탈로그: { designPct: 70, publishPct: 30 },
+};
+
+export const GRADE_OPTIONS_FOR_ESTIMATE = [
+  "사원",
+  "주임",
+  "대리",
+  "대리과장",
+  "과장",
+  "차장",
+  "팀장",
+] as const;
+
 export const DESIGN_KEYWORDS = ["디자인"];
 export const PUBLISH_KEYWORDS = ["퍼블리싱", "퍼블", "유지보수"];
 export const STAGE_FALLBACK_ROLE: Record<string, string> = {

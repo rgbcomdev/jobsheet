@@ -8,18 +8,133 @@ import {
   computeStageRatioByCategory,
 } from "@/lib/kpi";
 import {
+  buildGradeEstimateRows,
+  computeEstimateSplitRatio,
   estimateHoursFromBudget,
+  estimateStagePlanForRole,
   estimateStagePlanFromBudget,
+  resolveGradeAssignees,
   fmWon,
 } from "@/lib/estimate";
-import { DEFAULT_PROJECT_TYPES_BY_MAJOR } from "@/lib/constants";
+import {
+  DEFAULT_GRADE_DAILY_RATE,
+  DEFAULT_PROJECT_TYPES_BY_MAJOR,
+  GRADE_OPTIONS_FOR_ESTIMATE,
+  SPLIT_DESIGN_PUBLISH,
+  STAGES,
+} from "@/lib/constants";
 import { round1 } from "@/lib/time";
+
+type GradeGroupState = {
+  grade1: string;
+  grade2: string;
+  ratio1: number;
+  ratio2: number;
+};
+
+const defaultGrade = (): GradeGroupState => ({
+  grade1: "대리",
+  grade2: "",
+  ratio1: 100,
+  ratio2: 0,
+});
+
+function GradeControls({
+  label,
+  state,
+  onChange,
+}: {
+  label: string;
+  state: GradeGroupState;
+  onChange: (next: GradeGroupState) => void;
+}) {
+  return (
+    <div className="estimate-grade-row">
+      <strong style={{ minWidth: 90, fontSize: 13 }}>{label}</strong>
+      <label>담당1</label>
+      <select
+        value={state.grade1}
+        onChange={(e) => onChange({ ...state, grade1: e.target.value })}
+      >
+        {GRADE_OPTIONS_FOR_ESTIMATE.map((g) => (
+          <option key={g} value={g}>
+            {g}
+          </option>
+        ))}
+      </select>
+      {state.grade2 ? (
+        <>
+          <label>비중%</label>
+          <input
+            type="number"
+            style={{ width: 64 }}
+            value={state.ratio1}
+            min={0}
+            max={100}
+            onChange={(e) =>
+              onChange({ ...state, ratio1: Number(e.target.value) || 0 })
+            }
+          />
+        </>
+      ) : null}
+      <label>담당2</label>
+      <select
+        value={state.grade2}
+        onChange={(e) => {
+          const grade2 = e.target.value;
+          onChange({
+            ...state,
+            grade2,
+            ratio1: grade2 ? state.ratio1 || 50 : 100,
+            ratio2: grade2 ? state.ratio2 || 50 : 0,
+          });
+        }}
+      >
+        <option value="">없음</option>
+        {GRADE_OPTIONS_FOR_ESTIMATE.map((g) => (
+          <option key={g} value={g}>
+            {g}
+          </option>
+        ))}
+      </select>
+      {state.grade2 ? (
+        <>
+          <label>비중%</label>
+          <input
+            type="number"
+            style={{ width: 64 }}
+            value={state.ratio2}
+            min={0}
+            max={100}
+            onChange={(e) =>
+              onChange({ ...state, ratio2: Number(e.target.value) || 0 })
+            }
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 export function EstimatesView() {
   const { loading, data } = useJobsheet();
   const [tab, setTab] = useState<"디자인" | "동영상">("디자인");
   const [calcCategory, setCalcCategory] = useState("홈페이지");
   const [calcBudget, setCalcBudget] = useState("500");
+  const [singleGrade, setSingleGrade] = useState(defaultGrade);
+  const [designGrade, setDesignGrade] = useState(defaultGrade);
+  const [publishGrade, setPublishGrade] = useState(() => ({
+    ...defaultGrade(),
+    grade1: "사원",
+  }));
+
+  const gradeRates = useMemo(
+    () => ({
+      ...DEFAULT_GRADE_DAILY_RATE,
+      ...data.gradeDailyRate,
+    }),
+    [data.gradeDailyRate]
+  );
 
   const baseline = useMemo(
     () =>
@@ -38,10 +153,81 @@ export function EstimatesView() {
     DEFAULT_PROJECT_TYPES_BY_MAJOR[tab] ||
     [];
 
-  const plan = useMemo(() => {
-    const budget = Number(calcBudget) || 0;
-    if (!budget) return null;
-    return estimateStagePlanFromBudget(
+  const isSplit = SPLIT_DESIGN_PUBLISH.has(calcCategory);
+  const budget = Number(calcBudget) || 0;
+
+  const calcRows = useMemo(() => {
+    if (!budget) return { note: "", rows: [] as ReturnType<typeof buildGradeEstimateRows> };
+
+    if (isSplit) {
+      const ratio = computeEstimateSplitRatio(
+        calcCategory,
+        data.entries,
+        data.projectStatus,
+        data.staffRole,
+        data.leaveData
+      );
+      if (!ratio) {
+        return {
+          note: "이 카테고리는 완료된 프로젝트 데이터가 없어 디자인/퍼블 배분 비율을 계산할 수 없습니다.",
+          rows: [],
+        };
+      }
+      const designAmount = round1(budget * ratio.designRatio);
+      const publishAmount = round1(budget * ratio.publishRatio);
+      const designPlan = estimateStagePlanForRole(
+        calcCategory,
+        "디자인",
+        designAmount,
+        data.entries,
+        data.projectStatus,
+        data.staffRole,
+        data.leaveData,
+        data.estimates
+      );
+      const publishPlan = estimateStagePlanForRole(
+        calcCategory,
+        "퍼블",
+        publishAmount,
+        data.entries,
+        data.projectStatus,
+        data.staffRole,
+        data.leaveData,
+        data.estimates
+      );
+      const rows = [
+        ...buildGradeEstimateRows(
+          `${calcCategory} 디자인`,
+          designAmount,
+          designPlan?.stages || null,
+          resolveGradeAssignees(
+            designGrade.grade1,
+            designGrade.grade2,
+            designGrade.ratio1,
+            designGrade.ratio2
+          ),
+          gradeRates
+        ),
+        ...buildGradeEstimateRows(
+          `${calcCategory} 퍼블`,
+          publishAmount,
+          publishPlan?.stages || null,
+          resolveGradeAssignees(
+            publishGrade.grade1,
+            publishGrade.grade2,
+            publishGrade.ratio1,
+            publishGrade.ratio2
+          ),
+          gradeRates
+        ),
+      ];
+      return {
+        note: `견적 ${budget.toLocaleString("ko-KR")}만원을 디자인 ${ratio.designPct}%(${designAmount.toLocaleString("ko-KR")}만) : 퍼블 ${ratio.publishPct}%(${publishAmount.toLocaleString("ko-KR")}만)로 자동 배분했습니다.`,
+        rows,
+      };
+    }
+
+    const plan = estimateStagePlanFromBudget(
       calcCategory,
       budget,
       data.entries,
@@ -50,10 +236,39 @@ export function EstimatesView() {
       data.leaveData,
       data.estimates
     );
-  }, [calcBudget, calcCategory, data]);
+    if (!plan) {
+      return {
+        note: "이 카테고리는 완료된 프로젝트 데이터가 없어 기준선을 계산할 수 없습니다.",
+        rows: [],
+      };
+    }
+    return {
+      note: "",
+      rows: buildGradeEstimateRows(
+        calcCategory,
+        budget,
+        plan.stages,
+        resolveGradeAssignees(
+          singleGrade.grade1,
+          singleGrade.grade2,
+          singleGrade.ratio1,
+          singleGrade.ratio2
+        ),
+        gradeRates
+      ),
+    };
+  }, [
+    budget,
+    isSplit,
+    calcCategory,
+    data,
+    designGrade,
+    publishGrade,
+    singleGrade,
+    gradeRates,
+  ]);
 
   const hours = useMemo(() => {
-    const budget = Number(calcBudget) || 0;
     if (!budget) return null;
     return estimateHoursFromBudget(
       calcCategory,
@@ -64,7 +279,7 @@ export function EstimatesView() {
       data.leaveData,
       data.estimates
     );
-  }, [calcBudget, calcCategory, data]);
+  }, [calcBudget, calcCategory, data, budget]);
 
   if (loading) {
     return (
@@ -126,7 +341,9 @@ export function EstimatesView() {
               return (
                 <tr key={cat}>
                   <td>{cat}</td>
-                  <td className="center">{b ? `${b.usedCount}/${b.count}` : "-"}</td>
+                  <td className="center">
+                    {b ? `${b.usedCount}/${b.count}` : "-"}
+                  </td>
                   <td className="center mono">
                     {b ? b.avgWonPerHour.toLocaleString("ko-KR") : "-"}
                   </td>
@@ -168,56 +385,124 @@ export function EstimatesView() {
             onChange={(e) => setCalcBudget(e.target.value)}
           />
         </div>
+
+        {isSplit ? (
+          <>
+            <GradeControls
+              label="디자인 몫"
+              state={designGrade}
+              onChange={setDesignGrade}
+            />
+            <GradeControls
+              label="퍼블 몫"
+              state={publishGrade}
+              onChange={setPublishGrade}
+            />
+          </>
+        ) : (
+          <GradeControls
+            label="담당"
+            state={singleGrade}
+            onChange={setSingleGrade}
+          />
+        )}
+
         <p className="admin-sub">
-          예상 총 시간:{" "}
+          기준 시급 환산 총시간:{" "}
           <b>{hours != null ? `${hours}h` : "기준 데이터 부족"}</b>
           {hours != null && ` · 약 ${round1(hours / 8)}일 (8h 기준)`}
         </p>
-        {plan && (
+        {calcRows.note && <p className="admin-sub">{calcRows.note}</p>}
+
+        {calcRows.rows.length > 0 && (
           <table className="agg" style={{ marginTop: 12 }}>
             <thead>
               <tr>
-                <th>단계</th>
-                <th className="center">예상 시간</th>
-                <th className="center">예상 일수</th>
+                <th className="left">분야</th>
+                <th className="center">담당</th>
+                <th className="center">견적(배분)</th>
+                <th className="center">작업일수</th>
+                {STAGES.map((s) => (
+                  <th className="center" key={s}>
+                    {s}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {Object.entries(plan.stages).map(([s, v]) => (
-                <tr key={s}>
-                  <td>{s}</td>
-                  <td className="center mono">{v.hours}h</td>
-                  <td className="center mono">{v.days}일</td>
+              {calcRows.rows.map((r, i) => (
+                <tr key={`${r.label}-${r.grade}-${i}`}>
+                  <td>{r.label}</td>
+                  <td className="center">
+                    {r.grade}{" "}
+                    <span className="admin-sub">({r.ratio}%)</span>
+                  </td>
+                  <td className="center">
+                    {r.amount.toLocaleString("ko-KR")}만
+                  </td>
+                  {r.error ? (
+                    <td colSpan={5} className="center admin-sub">
+                      {r.error}
+                    </td>
+                  ) : (
+                    <>
+                      <td className="center" style={{ fontWeight: 600 }}>
+                        {r.days}일{" "}
+                        <span
+                          style={{ color: "var(--text-muted)", fontSize: 11 }}
+                        >
+                          ({r.hours}h)
+                        </span>
+                      </td>
+                      {STAGES.map((s) => {
+                        const st = r.stages?.[s];
+                        return (
+                          <td className="center" key={s}>
+                            {st ? (
+                              <>
+                                {st.days}일{" "}
+                                <span
+                                  style={{
+                                    color: "var(--text-muted)",
+                                    fontSize: 10.5,
+                                  }}
+                                >
+                                  ({st.hours}h)
+                                </span>
+                                <div
+                                  className="admin-sub"
+                                  style={{ fontSize: 10, marginTop: 2 }}
+                                >
+                                  {st.ratio}%
+                                </div>
+                              </>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                        );
+                      })}
+                    </>
+                  )}
                 </tr>
               ))}
-              <tr className="grand-total-row">
-                <td>합계</td>
-                <td className="center mono">{plan.totalHours}h</td>
-                <td className="center mono">
-                  {round1(plan.totalHours / 8)}일
-                </td>
-              </tr>
             </tbody>
           </table>
         )}
       </div>
 
       <div className="admin-page-section">
-        <h4>등록된 견적 샘플</h4>
+        <h4>등록 견적 샘플</h4>
         <table className="agg">
           <thead>
             <tr>
               <th>업체</th>
-              <th>카테고리</th>
+              <th>프로젝트</th>
               <th className="center">견적</th>
             </tr>
           </thead>
           <tbody>
             {Object.entries(data.estimates)
-              .filter(([k]) => {
-                const project = k.split("|||")[1];
-                return categories.includes(project);
-              })
               .slice(0, 40)
               .map(([k, amount]) => {
                 const [company, project] = k.split("|||");

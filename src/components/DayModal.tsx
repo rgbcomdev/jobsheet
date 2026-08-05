@@ -13,6 +13,16 @@ import {
 } from "@/lib/constants";
 import { computeDuration, computeOvertime, round1 } from "@/lib/time";
 import { summarizeNoteForCell } from "@/lib/aggregate";
+import {
+  computeDayTotalHours,
+  findInvertedTimeEntry,
+  findOverlappingEntries,
+  formatDaySaveOkMessage,
+  formatDayValidationError,
+  getLeaveTimeBounds,
+} from "@/lib/dayValidation";
+import { stageRuleWarning } from "@/lib/stageRules";
+import { CompanyAutocomplete } from "./CompanyAutocomplete";
 
 type Props = {
   owner: string;
@@ -65,7 +75,8 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   const [rows, setRows] = useState<WorkEntry[]>(initial);
   const [leaveOpen, setLeaveOpen] = useState(!!getLeave(owner, date));
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+  const [saveMsgKind, setSaveMsgKind] = useState<"ok" | "warn" | "error">("ok");
 
   useEffect(() => {
     if (open) {
@@ -73,6 +84,14 @@ export function DayModal({ owner, date, open, onClose }: Props) {
       setLeaveOpen(!!getLeave(owner, date));
     }
   }, [open, initial, getLeave, owner, date]);
+
+  const companyNames = useMemo(() => {
+    const names = new Set(data.companyMaster.filter(Boolean));
+    data.entries.forEach((e) => {
+      if (e.company) names.add(e.company);
+    });
+    return [...names].sort((a, b) => a.localeCompare(b, "ko"));
+  }, [data.companyMaster, data.entries]);
 
   if (!open) return null;
 
@@ -106,7 +125,41 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   ];
 
   const updateRow = (i: number, patch: Partial<WorkEntry>) => {
-    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    setRows((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        const next = { ...r, ...patch };
+        const bounds = getLeaveTimeBounds(getLeave(owner, date));
+        if (bounds.minStart && next.start < bounds.minStart) {
+          next.start = bounds.minStart;
+        }
+        if (bounds.maxEnd && next.end > bounds.maxEnd) {
+          next.end = bounds.maxEnd;
+        }
+        return next;
+      })
+    );
+  };
+
+  const showMsg = (
+    text: string,
+    kind: "ok" | "warn" | "error",
+    ms = 3500
+  ) => {
+    setSaveMsg(text);
+    setSaveMsgKind(kind);
+    setTimeout(() => setSaveMsg(""), ms);
+  };
+
+  const validateRows = (mode: "save" | "close") => {
+    const inverted = findInvertedTimeEntry(rows);
+    const overlap = findOverlappingEntries(rows);
+    const err = formatDayValidationError(inverted, overlap, mode);
+    if (err) {
+      showMsg(err, "error");
+      return false;
+    }
+    return true;
   };
 
   const clearLeave = () => {
@@ -320,14 +373,73 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   };
 
   const handleSave = async () => {
+    if (!validateRows("save")) return;
     setSaving(true);
     await saveDayEntries(owner, date, rows);
-    setSaveMsg(true);
+    const dayTotal = computeDayTotalHours(rows, leaveType);
+    const ok = formatDaySaveOkMessage(dayTotal);
+    setSaveMsg(ok.text);
+    setSaveMsgKind(ok.kind);
     setTimeout(() => {
-      setSaveMsg(false);
+      setSaveMsg("");
       setSaving(false);
       onClose();
-    }, 500);
+    }, ok.delay);
+  };
+
+  const tryClose = () => {
+    if (!validateRows("close")) return;
+    onClose();
+  };
+
+  const addTimeBlock = () => {
+    if (leaveType === "연차") {
+      alert(
+        "연차로 처리된 날에는 시간대를 추가할 수 없습니다. 먼저 상단의 휴가 처리를 해제해주세요."
+      );
+      return;
+    }
+    let start = "09:00";
+    let end = "12:00";
+    if (leaveType === "오전반차") {
+      start = "14:00";
+      end = "18:00";
+    } else if (leaveType === "오후반차") {
+      start = "09:00";
+      end = "13:00";
+    } else if (leaveType === "오전반반차") {
+      const hasFirst = rows.some((e) => e.start === "11:00");
+      if (hasFirst) {
+        start = "13:00";
+        end = "18:00";
+      } else {
+        start = "11:00";
+        end = "12:00";
+      }
+    } else if (leaveType === "오후반반차") {
+      const hasFirst = rows.some((e) => e.start === "09:00");
+      if (hasFirst) {
+        start = "13:00";
+        end = "16:00";
+      } else {
+        start = "09:00";
+        end = "12:00";
+      }
+    }
+    setRows((prev) => [
+      ...prev,
+      {
+        date,
+        owner,
+        start,
+        end,
+        company: "",
+        project: "",
+        note: "",
+        stage: "본작업",
+        major: "디자인",
+      },
+    ]);
   };
 
   const projectTypes =
@@ -359,12 +471,24 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     return Array.from(new Set([...fromData, ...fromDefault]));
   };
 
+  const applyCompanyPick = (i: number, company: string) => {
+    const info = data.companyCat[company.trim()];
+    if (info) {
+      const nextMajor = normalizeMajor(info.major) || "디자인";
+      const list = projectsForMajor(nextMajor);
+      const project = info.cat && list.includes(info.cat) ? info.cat : "";
+      updateRow(i, { company, major: nextMajor, project });
+    } else {
+      updateRow(i, { company });
+    }
+  };
+
   return (
-    <div className="overlay open" onClick={onClose}>
+    <div className="overlay open" onClick={tryClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3>{title}</h3>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={tryClose}>
             &times;
           </button>
         </div>
@@ -430,6 +554,12 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               e.company && e.project
                 ? getStatus(e.company, e.project) === "완료"
                 : false;
+            const warn = stageRuleWarning(
+              owner,
+              e.note,
+              e.stage,
+              data.employees
+            );
             return (
               <div
                 key={i}
@@ -459,29 +589,11 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                   </button>
                 </div>
                 <div className="me-row2">
-                  <input
-                    className="company"
-                    list="companyList"
-                    placeholder="업체명"
+                  <CompanyAutocomplete
                     value={e.company}
-                    onChange={(ev) => {
-                      const company = ev.target.value;
-                      const info = data.companyCat[company.trim()];
-                      if (info) {
-                        const nextMajor =
-                          normalizeMajor(info.major) || "디자인";
-                        const list = projectsForMajor(nextMajor);
-                        const project =
-                          info.cat && list.includes(info.cat) ? info.cat : "";
-                        updateRow(i, {
-                          company,
-                          major: nextMajor,
-                          project,
-                        });
-                      } else {
-                        updateRow(i, { company });
-                      }
-                    }}
+                    companyNames={companyNames}
+                    onChange={(company) => applyCompanyPick(i, company)}
+                    onPick={(company) => applyCompanyPick(i, company)}
                   />
                   <select
                     className="major-select"
@@ -524,6 +636,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                     value={e.note}
                     onChange={(ev) => updateRow(i, { note: ev.target.value })}
                   />
+                  {warn && <div className="stage-rule-warn">{warn}</div>}
                 </div>
                 <div className="me-row3">
                   <select
@@ -561,32 +674,20 @@ export function DayModal({ owner, date, open, onClose }: Props) {
           })}
         </div>
 
-        <button
-          type="button"
-          className="modal-add"
-          onClick={() =>
-            setRows((prev) => [
-              ...prev,
-              {
-                date,
-                owner,
-                start: "09:00",
-                end: "12:00",
-                company: "",
-                project: "",
-                note: "",
-                stage: "본작업",
-                major: "디자인",
-              },
-            ])
-          }
-        >
+        <button type="button" className="modal-add" onClick={addTimeBlock}>
           + 시간대 추가
         </button>
 
         <div className="modal-footer">
-          <span className={"save-msg" + (saveMsg ? " show" : "")}>
-            저장되었습니다
+          <span
+            className={
+              "save-msg" +
+              (saveMsg ? " show" : "") +
+              (saveMsgKind === "error" ? " error" : "") +
+              (saveMsgKind === "warn" ? " warn" : "")
+            }
+          >
+            {saveMsg}
           </span>
           <button
             type="button"
@@ -598,11 +699,6 @@ export function DayModal({ owner, date, open, onClose }: Props) {
           </button>
         </div>
       </div>
-      <datalist id="companyList">
-        {data.companyMaster.filter(Boolean).map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
     </div>
   );
 }

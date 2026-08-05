@@ -27,7 +27,9 @@ export function computeDuration(
   const isHalfDayLeave =
     leaveType === "오전반차" ||
     leaveType === "오후반차" ||
-    leaveType === "반반차";
+    leaveType === "반반차" ||
+    leaveType === "오전반반차" ||
+    leaveType === "오후반반차";
   if (!isHalfDayLeave) {
     dur -= breakOverlap(a, b, 12, 13);
   }

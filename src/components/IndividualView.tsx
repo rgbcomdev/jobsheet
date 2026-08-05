@@ -381,7 +381,15 @@ export function IndividualView({ name }: { name: string }) {
                         `백업을 불러오면 현재 데이터가 대체됩니다.\n기록 ${parsed.entries?.length || 0}건\n계속할까요?`
                       )
                     ) {
-                      replaceFromBackup(parsed);
+                      try {
+                        await replaceFromBackup(parsed);
+                        alert("백업 복원이 완료되었습니다.");
+                      } catch (err) {
+                        console.error(err);
+                        alert(
+                          "로컬 반영은 되었으나 원격 저장에 실패했을 수 있습니다."
+                        );
+                      }
                     }
                   } catch {
                     alert("유효하지 않은 백업 파일입니다.");

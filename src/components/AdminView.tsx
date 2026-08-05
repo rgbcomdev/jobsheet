@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useJobsheet } from "@/context/JobsheetContext";
 import { MAJORS, DEFAULT_PROJECT_TYPES_BY_MAJOR } from "@/lib/constants";
 import { buildBackupPayload, downloadBackup, parseBackupFile } from "@/lib/backup";
@@ -17,7 +18,9 @@ export function AdminView() {
     upsertCompany,
     reorderEmployees,
     replaceFromBackup,
+    activeEmployeesByTeam,
   } = useJobsheet();
+  const router = useRouter();
 
   const [showFormer, setShowFormer] = useState(false);
   const [regName, setRegName] = useState("");
@@ -38,6 +41,13 @@ export function AdminView() {
   const [regProject, setRegProject] = useState("");
   const [regTask, setRegTask] = useState("");
   const [regStartMonth, setRegStartMonth] = useState("");
+  const [assigneeModal, setAssigneeModal] = useState<{
+    name: string;
+    major: string;
+    sm: string;
+  } | null>(null);
+  const [assigneePick, setAssigneePick] = useState("");
+  const [restoring, setRestoring] = useState(false);
 
   const employeesByTeam = useMemo(() => {
     const out: Record<
@@ -170,7 +180,18 @@ export function AdminView() {
                       `백업을 불러오면 현재 데이터가 대체됩니다.\n기록 ${parsed.entries?.length || 0}건\n계속할까요?`
                     )
                   ) {
-                    replaceFromBackup(parsed);
+                    setRestoring(true);
+                    try {
+                      await replaceFromBackup(parsed);
+                      alert("백업 복원이 완료되었습니다.");
+                    } catch (err) {
+                      console.error(err);
+                      alert(
+                        "로컬 반영은 되었으나 원격 저장에 실패했을 수 있습니다. 콘솔을 확인해주세요."
+                      );
+                    } finally {
+                      setRestoring(false);
+                    }
                   }
                 } catch {
                   alert("유효하지 않은 백업 파일입니다.");
@@ -413,14 +434,18 @@ export function AdminView() {
             className="backup-btn"
             onClick={async () => {
               if (!regCompany.trim()) return;
-              await upsertCompany(regCompany.trim(), {
+              const name = regCompany.trim();
+              const sm = regStartMonth;
+              await upsertCompany(name, {
                 major: regMajor,
                 cat: regProject,
                 task: regTask,
-                sm: regStartMonth,
+                sm,
               });
               setRegCompany("");
               setRegTask("");
+              setAssigneePick("");
+              setAssigneeModal({ name, major: regMajor, sm });
             }}
           >
             확정
@@ -546,6 +571,84 @@ export function AdminView() {
                 확정
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {assigneeModal && (
+        <div
+          className="overlay open"
+          onClick={() => setAssigneeModal(null)}
+        >
+          <div
+            className="modal admin-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h3>담당자 지정</h3>
+              <button type="button" onClick={() => setAssigneeModal(null)}>
+                &times;
+              </button>
+            </div>
+            <p className="modal-sub">
+              &quot;{assigneeModal.name}&quot; 등록 완료
+              {assigneeModal.sm ? ` (${assigneeModal.sm} 시작)` : ""}.
+              담당자를 고르면 그 사람의 화면으로 바로 이동합니다.
+            </p>
+            <div className="emp-edit-form">
+              <div className="emp-edit-row">
+                <label>담당자</label>
+                <select
+                  value={assigneePick}
+                  onChange={(e) => setAssigneePick(e.target.value)}
+                >
+                  <option value="">미지정 (나중에 지정)</option>
+                  {(assigneeModal.major === "동영상"
+                    ? activeEmployeesByTeam["영상"] || []
+                    : activeEmployeesByTeam["디자인"] || []
+                  ).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="modal-save"
+                onClick={async () => {
+                  const { name, sm } = assigneeModal;
+                  const info = data.companyCat[name] || {};
+                  if (assigneePick) {
+                    await upsertCompany(name, {
+                      ...info,
+                      assignee: assigneePick,
+                    });
+                    setAssigneeModal(null);
+                    const jumpDate = sm
+                      ? `${sm}-01`
+                      : new Date().toISOString().slice(0, 10);
+                    router.push(
+                      `/e/${encodeURIComponent(assigneePick)}?date=${jumpDate}`
+                    );
+                  } else {
+                    setAssigneeModal(null);
+                  }
+                }}
+              >
+                확정
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restoring && (
+        <div className="overlay open">
+          <div className="modal admin-modal">
+            <p className="modal-sub">백업을 복원하는 중…</p>
           </div>
         </div>
       )}
