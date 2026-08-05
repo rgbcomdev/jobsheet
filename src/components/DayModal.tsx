@@ -515,6 +515,8 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     const toSave = leaveType === "연차" ? [] : rows;
     if (leaveType !== "연차" && !validateRows("save")) return;
     setSaving(true);
+    // 휴가는 칩 선택 시에도 저장되지만, 저장 버튼에서 한 번 더 보장
+    await setLeave(owner, date, leaveType || "");
     await saveDayEntries(owner, date, toSave);
     const dayTotal = computeDayTotalHours(toSave, leaveType);
     const ok = formatDaySaveOkMessage(dayTotal);

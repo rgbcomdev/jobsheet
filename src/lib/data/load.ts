@@ -170,15 +170,15 @@ export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
     seed.projectStatus[`${s.company}|||${s.project}`] = String(s.status);
   });
   leaves.forEach((l) => {
-    seed.leaveData[`${l.employee_name}|||${l.date}`] = String(l.leave_type);
+    const date = String(l.date).slice(0, 10);
+    seed.leaveData[`${l.employee_name}|||${date}`] = String(l.leave_type);
   });
   duties.forEach((d) => {
-    seed.publicDutyData[`${d.employee_name}|||${d.date}`] = String(
-      d.duty_type
-    );
+    const date = String(d.date).slice(0, 10);
+    seed.publicDutyData[`${d.employee_name}|||${date}`] = String(d.duty_type);
   });
   holidays.forEach((h) => {
-    seed.holidays[String(h.date)] = String(h.name);
+    seed.holidays[String(h.date).slice(0, 10)] = String(h.name);
   });
   grades.forEach((g) => {
     seed.gradeDailyRate[String(g.grade)] = Number(g.daily_rate);

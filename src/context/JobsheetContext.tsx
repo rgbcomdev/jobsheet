@@ -22,11 +22,15 @@ type Ctx = {
   setData: React.Dispatch<React.SetStateAction<JobsheetSeed>>;
   refresh: () => Promise<void>;
   getStatus: (company: string, project: string) => string;
-  setStatus: (company: string, project: string, status: string) => void;
+  setStatus: (
+    company: string,
+    project: string,
+    status: string
+  ) => Promise<void>;
   getLeave: (name: string, date: string) => string;
-  setLeave: (name: string, date: string, type: string) => void;
+  setLeave: (name: string, date: string, type: string) => Promise<void>;
   getPublicDuty: (name: string, date: string) => string;
-  setPublicDuty: (name: string, date: string, type: string) => void;
+  setPublicDuty: (name: string, date: string, type: string) => Promise<void>;
   saveDayEntries: (
     owner: string,
     date: string,
@@ -122,18 +126,21 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setStatus = useCallback(
-    (company: string, project: string, status: string) => {
+    async (company: string, project: string, status: string) => {
       const key = projectKey(company, project);
       setData((prev) => ({
         ...prev,
         projectStatus: { ...prev.projectStatus, [key]: status },
       }));
       const sb = getSupabase();
-      if (sb) {
-        void sb
-          .from("project_statuses")
-          .upsert({ company, project, status });
-      }
+      if (!sb) return;
+      const { error } = await sb
+        .from("project_statuses")
+        .upsert(
+          { company, project, status },
+          { onConflict: "company,project" }
+        );
+      if (error) console.error("project_statuses upsert failed", error);
     },
     []
   );
@@ -143,7 +150,7 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
     [data.leaveData]
   );
 
-  const setLeave = useCallback((name: string, date: string, type: string) => {
+  const setLeave = useCallback(async (name: string, date: string, type: string) => {
     setData((prev) => {
       const next = { ...prev.leaveData };
       const k = leaveKey(name, date);
@@ -152,14 +159,20 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
       return { ...prev, leaveData: next };
     });
     const sb = getSupabase();
-    if (sb) {
-      if (type) {
-        void sb
-          .from("leaves")
-          .upsert({ employee_name: name, date, leave_type: type });
-      } else {
-        void sb.from("leaves").delete().eq("employee_name", name).eq("date", date);
-      }
+    if (!sb) return;
+    if (type) {
+      const { error } = await sb.from("leaves").upsert(
+        { employee_name: name, date, leave_type: type },
+        { onConflict: "employee_name,date" }
+      );
+      if (error) console.error("leaves upsert failed", error);
+    } else {
+      const { error } = await sb
+        .from("leaves")
+        .delete()
+        .eq("employee_name", name)
+        .eq("date", date);
+      if (error) console.error("leaves delete failed", error);
     }
   }, []);
 
@@ -170,7 +183,7 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setPublicDuty = useCallback(
-    (name: string, date: string, type: string) => {
+    async (name: string, date: string, type: string) => {
       setData((prev) => {
         const next = { ...prev.publicDutyData };
         const k = leaveKey(name, date);
@@ -179,18 +192,20 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, publicDutyData: next };
       });
       const sb = getSupabase();
-      if (sb) {
-        if (type) {
-          void sb
-            .from("public_duties")
-            .upsert({ employee_name: name, date, duty_type: type });
-        } else {
-          void sb
-            .from("public_duties")
-            .delete()
-            .eq("employee_name", name)
-            .eq("date", date);
-        }
+      if (!sb) return;
+      if (type) {
+        const { error } = await sb.from("public_duties").upsert(
+          { employee_name: name, date, duty_type: type },
+          { onConflict: "employee_name,date" }
+        );
+        if (error) console.error("public_duties upsert failed", error);
+      } else {
+        const { error } = await sb
+          .from("public_duties")
+          .delete()
+          .eq("employee_name", name)
+          .eq("date", date);
+        if (error) console.error("public_duties delete failed", error);
       }
     },
     []
