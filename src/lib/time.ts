@@ -18,21 +18,14 @@ export function breakOverlap(a: number, b: number, bs: number, be: number) {
 export function computeDuration(
   s: string,
   e: string,
-  leaveType?: string
+  _leaveType?: string
 ) {
   let a = timeToHours(s);
   let b = timeToHours(e);
   if (b < a) b += 24;
   let dur = Math.max(0, b - a);
-  const isHalfDayLeave =
-    leaveType === "오전반차" ||
-    leaveType === "오후반차" ||
-    leaveType === "반반차" ||
-    leaveType === "오전반반차" ||
-    leaveType === "오후반반차";
-  if (!isHalfDayLeave) {
-    dur -= breakOverlap(a, b, 12, 13);
-  }
+  // 반차·반반차 포함, 점심(12~13)은 항상 차감
+  dur -= breakOverlap(a, b, 12, 13);
   dur -= breakOverlap(a, b, 18, 19);
   return Math.max(0, dur);
 }
