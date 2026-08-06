@@ -17,7 +17,6 @@ import {
 } from "@/lib/aggregate";
 import { computeDuration, computeOvertime, pad, round1 } from "@/lib/time";
 import { exportMonthlyExcel } from "@/lib/excel";
-import { buildBackupPayload, downloadBackup, parseBackupFile } from "@/lib/backup";
 import { DayModal } from "./DayModal";
 
 export function IndividualView({ name }: { name: string }) {
@@ -31,7 +30,6 @@ export function IndividualView({ name }: { name: string }) {
     setStatus,
     getLeave,
     getPublicDuty,
-    replaceFromBackup,
   } = useJobsheet();
 
   const activeEmployeeNames = useMemo(
@@ -361,49 +359,6 @@ export function IndividualView({ name }: { name: string }) {
             >
               이달 엑셀 다운로드
             </button>
-            <button
-              type="button"
-              className="backup-btn"
-              onClick={() =>
-                downloadBackup(buildBackupPayload(data, name), year, month)
-              }
-            >
-              백업저장
-            </button>
-            <label className="backup-btn" style={{ cursor: "pointer" }}>
-              백업가져오기
-              <input
-                type="file"
-                accept="application/json"
-                style={{ display: "none" }}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const text = await file.text();
-                  try {
-                    const parsed = parseBackupFile(text);
-                    if (
-                      confirm(
-                        `백업을 불러오면 현재 데이터가 대체됩니다.\n기록 ${parsed.entries?.length || 0}건\n계속할까요?`
-                      )
-                    ) {
-                      try {
-                        await replaceFromBackup(parsed);
-                        alert("백업 복원이 완료되었습니다.");
-                      } catch (err) {
-                        console.error(err);
-                        alert(
-                          "로컬 반영은 되었으나 원격 저장에 실패했을 수 있습니다."
-                        );
-                      }
-                    }
-                  } catch {
-                    alert("유효하지 않은 백업 파일입니다.");
-                  }
-                  e.target.value = "";
-                }}
-              />
-            </label>
           </div>
         </div>
       </div>
