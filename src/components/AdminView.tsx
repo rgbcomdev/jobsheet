@@ -207,7 +207,7 @@ export function AdminView() {
             className="backup-btn"
             onClick={async () => {
               await fetch("/api/auth/logout", { method: "POST" });
-              window.location.href = "/";
+              window.location.href = "/login";
             }}
           >
             로그아웃

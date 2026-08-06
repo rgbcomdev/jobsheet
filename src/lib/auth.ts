@@ -69,17 +69,19 @@ export async function verifyAdminSession(
   return username === id;
 }
 
-export function validateAdminLogin(id: string, password: string) {
+export function validateSitePassword(password: string) {
   const cred = getAdminCredentials();
-  if (id.length !== cred.id.length || password.length !== cred.password.length) {
-    return false;
-  }
+  if (password.length !== cred.password.length) return false;
   let out = 0;
-  for (let i = 0; i < id.length; i++) {
-    out |= id.charCodeAt(i) ^ cred.id.charCodeAt(i);
-  }
   for (let i = 0; i < password.length; i++) {
     out |= password.charCodeAt(i) ^ cred.password.charCodeAt(i);
   }
   return out === 0;
+}
+
+/** @deprecated 사이트는 비밀번호만 사용. 호환용으로 유지 */
+export function validateAdminLogin(id: string, password: string) {
+  const cred = getAdminCredentials();
+  if (id && id !== cred.id) return false;
+  return validateSitePassword(password);
 }

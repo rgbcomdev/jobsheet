@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_COOKIE,
+  getAdminCredentials,
   signAdminSession,
-  validateAdminLogin,
+  validateSitePassword,
 } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
@@ -13,16 +14,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const id = (body.id || "").trim();
   const password = body.password || "";
 
-  if (!validateAdminLogin(id, password)) {
+  if (!validateSitePassword(password)) {
     return NextResponse.json(
-      { error: "아이디 또는 비밀번호가 올바르지 않습니다." },
+      { error: "비밀번호가 올바르지 않습니다." },
       { status: 401 }
     );
   }
 
+  const { id } = getAdminCredentials();
   const token = await signAdminSession(id);
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE, token, {
