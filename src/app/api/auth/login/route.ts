@@ -24,14 +24,14 @@ export async function POST(req: NextRequest) {
   }
 
   const { id } = getAdminCredentials();
-  const token = await signAdminSession(id);
+  // 브라우저를 닫으면 사라지는 세션 쿠키 (maxAge 없음)
+  const token = await signAdminSession(id, 60 * 60 * 12);
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
   });
   return res;
 }

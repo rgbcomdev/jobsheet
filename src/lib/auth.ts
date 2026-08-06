@@ -1,4 +1,4 @@
-export const ADMIN_COOKIE = "rgb_admin_session";
+export const ADMIN_COOKIE = "rgb_site_session";
 
 function getSecret() {
   return (

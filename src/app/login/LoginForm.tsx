@@ -39,7 +39,8 @@ export default function LoginForm() {
       <div className="admin-page-section" style={{ margin: 0 }}>
         <h1 style={{ fontSize: 20, margin: "0 0 8px" }}>RGB 업무일지</h1>
         <p className="admin-sub" style={{ marginTop: 0 }}>
-          비밀번호를 입력하면 사이트에 접속할 수 있습니다.
+          비밀번호를 입력하면 접속할 수 있습니다. 브라우저를 닫으면 다시
+          입력해야 합니다.
         </p>
         <form
           onSubmit={onSubmit}
