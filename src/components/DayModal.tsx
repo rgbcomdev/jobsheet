@@ -26,6 +26,7 @@ import {
 } from "@/lib/dayValidation";
 import { stageRuleWarning } from "@/lib/stageRules";
 import { CompanyAutocomplete } from "./CompanyAutocomplete";
+import { TimeSelect } from "./TimeSelect";
 
 type Props = {
   owner: string;
@@ -442,81 +443,6 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   const leaveBounds = getLeaveTimeBounds(leaveType);
   const leaveWindowLabel = getLeaveWorkWindowLabel(leaveType);
 
-  const hoursOptionsAll = Array.from({ length: 25 }, (_, i) =>
-    String(i).padStart(2, "0")
-  );
-  const minOptionsAll = ["00", "10", "20", "30", "40", "50"];
-
-  const TimeSelect = ({
-    value,
-    onChange,
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-  }) => {
-    const [h, m] = value.split(":");
-    const minT = leaveBounds.minStart;
-    const maxT = leaveBounds.maxEnd;
-    const minH = minT ? Number(minT.slice(0, 2)) : 0;
-    const maxH = maxT ? Number(maxT.slice(0, 2)) : 24;
-    const minM = minT ? Number(minT.slice(3, 5)) : 0;
-    const maxM = maxT ? Number(maxT.slice(3, 5)) : 50;
-
-    const hoursOptions = hoursOptionsAll.filter((x) => {
-      const n = Number(x);
-      return n >= minH && n <= maxH;
-    });
-
-    const minOptions = minOptionsAll.filter((x) => {
-      const n = Number(x);
-      const hour = Number(h);
-      if (hour === 24) return n === 0;
-      if (hour === minH && n < minM) return false;
-      if (hour === maxH && n > maxM) return false;
-      return true;
-    });
-
-    return (
-      <>
-        <select
-          className="time-h"
-          value={h}
-          onChange={(e) => {
-            const nh = e.target.value;
-            let nm = m;
-            const hour = Number(nh);
-            if (hour === 24) nm = "00";
-            else {
-              if (hour === minH && Number(nm) < minM)
-                nm = String(minM).padStart(2, "0");
-              if (hour === maxH && Number(nm) > maxM)
-                nm = String(maxM).padStart(2, "0");
-            }
-            onChange(`${nh}:${nm}`);
-          }}
-        >
-          {hoursOptions.map((x) => (
-            <option key={x} value={x}>
-              {x}
-            </option>
-          ))}
-        </select>
-        <span className="colon">:</span>
-        <select
-          className="time-m"
-          value={minOptions.includes(m) ? m : minOptions[0] || m}
-          onChange={(e) => onChange(`${h}:${e.target.value}`)}
-        >
-          {minOptions.map((x) => (
-            <option key={x} value={x}>
-              {x}
-            </option>
-          ))}
-        </select>
-      </>
-    );
-  };
-
   const handleSave = async () => {
     const toSave = leaveType === "연차" ? [] : rows;
     if (leaveType !== "연차" && !validateRows("save")) return;
@@ -731,12 +657,16 @@ export function DayModal({ owner, date, open, onClose }: Props) {
               >
                 <div className="me-row1">
                   <TimeSelect
+                    role="start"
                     value={e.start}
+                    leaveBounds={leaveBounds}
                     onChange={(v) => updateRow(i, { start: v })}
                   />
                   <span className="colon">~</span>
                   <TimeSelect
+                    role="end"
                     value={e.end}
+                    leaveBounds={leaveBounds}
                     onChange={(v) => updateRow(i, { end: v })}
                   />
                   <span className={"dur" + (ot > 0 ? " ot" : "")}>
