@@ -30,7 +30,20 @@ export function computeDuration(
   return Math.max(0, dur);
 }
 
-export function computeOvertime(s: string, e: string) {
+/** YYYY-MM-DD 기준 토·일 여부 */
+export function isWeekendDate(dateStr?: string) {
+  if (!dateStr) return false;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const dow = new Date(y, m - 1, d).getDay();
+  return dow === 0 || dow === 6;
+}
+
+/** 평일: 19시 이후 / 주말: 해당일 근무시간 전부 추가근무 */
+export function computeOvertime(s: string, e: string, dateStr?: string) {
+  if (isWeekendDate(dateStr)) {
+    return computeDuration(s, e);
+  }
   let a = timeToHours(s);
   let b = timeToHours(e);
   if (b < a) b += 24;

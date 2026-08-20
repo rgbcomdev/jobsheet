@@ -442,7 +442,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   const leaveBounds = getLeaveTimeBounds(leaveType);
   const leaveWindowLabel = getLeaveWorkWindowLabel(leaveType);
 
-  const hoursOptionsAll = Array.from({ length: 24 }, (_, i) =>
+  const hoursOptionsAll = Array.from({ length: 25 }, (_, i) =>
     String(i).padStart(2, "0")
   );
   const minOptionsAll = ["00", "10", "20", "30", "40", "50"];
@@ -458,7 +458,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     const minT = leaveBounds.minStart;
     const maxT = leaveBounds.maxEnd;
     const minH = minT ? Number(minT.slice(0, 2)) : 0;
-    const maxH = maxT ? Number(maxT.slice(0, 2)) : 23;
+    const maxH = maxT ? Number(maxT.slice(0, 2)) : 24;
     const minM = minT ? Number(minT.slice(3, 5)) : 0;
     const maxM = maxT ? Number(maxT.slice(3, 5)) : 50;
 
@@ -470,6 +470,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     const minOptions = minOptionsAll.filter((x) => {
       const n = Number(x);
       const hour = Number(h);
+      if (hour === 24) return n === 0;
       if (hour === minH && n < minM) return false;
       if (hour === maxH && n > maxM) return false;
       return true;
@@ -484,8 +485,13 @@ export function DayModal({ owner, date, open, onClose }: Props) {
             const nh = e.target.value;
             let nm = m;
             const hour = Number(nh);
-            if (hour === minH && Number(nm) < minM) nm = String(minM).padStart(2, "0");
-            if (hour === maxH && Number(nm) > maxM) nm = String(maxM).padStart(2, "0");
+            if (hour === 24) nm = "00";
+            else {
+              if (hour === minH && Number(nm) < minM)
+                nm = String(minM).padStart(2, "0");
+              if (hour === maxH && Number(nm) > maxM)
+                nm = String(maxM).padStart(2, "0");
+            }
             onChange(`${nh}:${nm}`);
           }}
         >
@@ -705,7 +711,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
             rows.map((e, i) => {
             const leave = leaveType;
             const dur = computeDuration(e.start, e.end, leave);
-            const ot = computeOvertime(e.start, e.end);
+            const ot = computeOvertime(e.start, e.end, date);
             const major = resolveMajor(e);
             const projectOptions = projectsForMajor(major);
             const done =

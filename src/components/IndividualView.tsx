@@ -77,7 +77,7 @@ export function IndividualView({ name }: { name: string }) {
       if (!e.date.startsWith(monthPrefix)) return;
       const leave = getLeave(name, e.date);
       total += computeDuration(e.start, e.end, leave);
-      ot += computeOvertime(e.start, e.end);
+      ot += computeOvertime(e.start, e.end, e.date);
     });
     return { total: round1(total), ot: round1(ot) };
   }, [data.entries, name, monthPrefix, getLeave]);

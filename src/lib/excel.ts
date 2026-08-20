@@ -91,7 +91,7 @@ export function exportMonthlyExcel(
       list.forEach((e) => {
         const leave = leaveData[`${owner}|||${dateStr}`] || "";
         hours += computeDuration(e.start, e.end, leave);
-        weekOt += computeOvertime(e.start, e.end);
+        weekOt += computeOvertime(e.start, e.end, dateStr);
       });
       totalRow.push(hours > 0 ? hoursToTimeValue(hours) : "");
     });
