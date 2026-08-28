@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useJobsheet } from "@/context/JobsheetContext";
 import { MAJORS, DEFAULT_PROJECT_TYPES_BY_MAJOR } from "@/lib/constants";
 import { buildBackupPayload, downloadBackup, parseBackupFile } from "@/lib/backup";
+import { exportAllMonthlyExcel } from "@/lib/excel";
 
 const TEAM_ORDER = ["디자인", "영상"] as const;
 
@@ -49,6 +50,8 @@ export function AdminView() {
   } | null>(null);
   const [assigneePick, setAssigneePick] = useState("");
   const [restoring, setRestoring] = useState(false);
+  const [exportMonth, setExportMonth] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [showCompanyList, setShowCompanyList] = useState(false);
 
   const employeesByTeam = useMemo(() => {
@@ -124,6 +127,48 @@ export function AdminView() {
     return out;
   }, []);
 
+  /** 업무일지 기록이 있는 월 (최신순) */
+  const entryMonths = useMemo(() => {
+    const set = new Set<string>();
+    data.entries.forEach((e) => set.add(e.date.slice(0, 7)));
+    return [...set].sort().reverse();
+  }, [data.entries]);
+
+  const activeNames = useMemo(
+    () => Object.values(activeEmployeesByTeam).flat(),
+    [activeEmployeesByTeam]
+  );
+
+  const handleExportAll = async () => {
+    const ym = exportMonth || entryMonths[0];
+    if (!ym) {
+      alert("내보낼 업무일지 기록이 없습니다.");
+      return;
+    }
+    const [y, m] = ym.split("-").map(Number);
+    setExporting(true);
+    try {
+      const res = await exportAllMonthlyExcel({
+        owners: activeNames,
+        year: y,
+        month: m,
+        data,
+      });
+      if (!res.count) {
+        alert(`${y}년 ${m}월에 기록이 있는 재직 직원이 없습니다.`);
+      } else if (res.skipped) {
+        alert(
+          `${y}년 ${m}월 업무일지 ${res.count}명 다운로드 완료\n(기록이 없는 ${res.skipped}명은 제외했습니다)`
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      alert("엑셀 생성에 실패했습니다.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="wrap">
@@ -149,6 +194,26 @@ export function AdminView() {
           <Link href="/admin/estimates" className="backup-btn">
             견적·작업시간 분석
           </Link>
+          <select
+            className="backup-btn"
+            value={exportMonth || entryMonths[0] || ""}
+            onChange={(e) => setExportMonth(e.target.value)}
+            title="전체 업무일지를 내려받을 월"
+          >
+            {entryMonths.map((ym) => (
+              <option key={ym} value={ym}>
+                {Number(ym.slice(0, 4))}년 {Number(ym.slice(5, 7))}월
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="backup-btn"
+            disabled={exporting || !entryMonths.length}
+            onClick={handleExportAll}
+          >
+            {exporting ? "생성 중…" : "전직원 업무일지 다운로드"}
+          </button>
           <button
             type="button"
             className="backup-btn"

@@ -131,13 +131,35 @@ type DayColumn = {
   total: number;
 };
 
-export async function exportMonthlyExcel(opts: {
-  owner: string;
-  year: number;
-  month: number;
-  data: JobsheetSeed;
-}) {
-  const { owner, year, month, data } = opts;
+/** 엑셀 시트명 제약(31자, 일부 기호 불가)에 맞게 다듬고 중복을 피한다 */
+function safeSheetName(name: string, used: Set<string>) {
+  let base = (name || "무제")
+    .replace(/[\\/?*[\]:]/g, " ")
+    .trim()
+    .slice(0, 31);
+  if (!base) base = "무제";
+  let out = base;
+  let n = 2;
+  while (used.has(out)) {
+    const suffix = `(${n++})`;
+    out = base.slice(0, 31 - suffix.length) + suffix;
+  }
+  used.add(out);
+  return out;
+}
+
+/** 한 직원의 월간 업무일지 시트를 워크북에 추가한다 */
+function buildMonthlySheet(
+  wb: ExcelJS.Workbook,
+  opts: {
+    owner: string;
+    year: number;
+    month: number;
+    data: JobsheetSeed;
+    sheetName: string;
+  }
+) {
+  const { owner, year, month, data, sheetName } = opts;
   const { entries, leaveData, holidays, publicDutyData } = data;
 
   const monthPrefix = `${year}-${pad(month)}`;
@@ -179,8 +201,7 @@ export async function exportMonthlyExcel(opts: {
   const maxDays = Math.max(1, ...weeks.map((w) => w.length));
   const TOTAL_COL = 2 + maxDays * 2;
 
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet(`${month}월`);
+  const ws = wb.addWorksheet(sheetName);
   const hourCells: { row: number; col: number }[] = [];
   const headerCells: { row: number; col: number }[] = [];
 
@@ -356,8 +377,49 @@ export async function exportMonthlyExcel(opts: {
     thickBottomRows: headerRowIndexes,
   });
   markHeaderCells(ws, headerCells);
+}
 
+export async function exportMonthlyExcel(opts: {
+  owner: string;
+  year: number;
+  month: number;
+  data: JobsheetSeed;
+}) {
+  const { owner, year, month } = opts;
+  const wb = new ExcelJS.Workbook();
+  buildMonthlySheet(wb, { ...opts, sheetName: `${month}월` });
   await downloadWorkbook(wb, `${owner}_${year}년_${month}월_업무일지.xlsx`);
+}
+
+/** 그 달에 기록이 있는 직원만 골라 한 파일에 시트로 모은다 */
+export async function exportAllMonthlyExcel(opts: {
+  owners: string[];
+  year: number;
+  month: number;
+  data: JobsheetSeed;
+}) {
+  const { owners, year, month, data } = opts;
+  const monthPrefix = `${year}-${pad(month)}`;
+  const targets = owners.filter((name) =>
+    data.entries.some(
+      (e) => (e.owner || "") === name && e.date.startsWith(monthPrefix)
+    )
+  );
+  if (!targets.length) return { count: 0, skipped: owners.length };
+
+  const wb = new ExcelJS.Workbook();
+  const used = new Set<string>();
+  targets.forEach((owner) => {
+    buildMonthlySheet(wb, {
+      owner,
+      year,
+      month,
+      data,
+      sheetName: safeSheetName(owner, used),
+    });
+  });
+  await downloadWorkbook(wb, `RGB_${year}년_${month}월_업무일지.xlsx`);
+  return { count: targets.length, skipped: owners.length - targets.length };
 }
 
 export type ProjectExportItem = {
