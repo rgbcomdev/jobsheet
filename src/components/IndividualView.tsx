@@ -346,16 +346,9 @@ export function IndividualView({ name }: { name: string }) {
             <button
               type="button"
               className="backup-btn"
-              onClick={() =>
-                exportMonthlyExcel(
-                  name,
-                  year,
-                  month,
-                  data.entries,
-                  data.leaveData,
-                  data.holidays
-                )
-              }
+              onClick={() => {
+                void exportMonthlyExcel({ owner: name, year, month, data });
+              }}
             >
               이달 엑셀 다운로드
             </button>

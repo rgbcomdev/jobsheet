@@ -308,7 +308,7 @@ export function TeamKpiView() {
 
     const tabLabel =
       tab === "전체" ? "전체" : tab === "디자인" ? "디자인팀" : "영상팀";
-    exportTeamKpiExcel({
+    void exportTeamKpiExcel({
       startMonth: start,
       endMonth: end,
       tabLabel,

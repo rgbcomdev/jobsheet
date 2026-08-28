@@ -8,6 +8,7 @@ import {
   buildGroups,
   buildTaskStageBreakdown,
   deriveMajorSub,
+  type AggGroup,
   type TaskStageRow,
 } from "@/lib/aggregate";
 import {
@@ -94,13 +95,21 @@ export function ProjectsView({ name }: { name: string }) {
     );
   };
 
-  const estimateText = (company: string, project: string) => {
-    const personKey = `${company}|||${project}|||${name}`;
-    const person = data.personEstimates[personKey];
-    if (person != null) return `${person.toLocaleString("ko-KR")}만`;
+  const estimateInfo = (
+    company: string,
+    project: string
+  ): { value: number | null; scope: "개인" | "전체" | null } => {
+    const person = data.personEstimates[`${company}|||${project}|||${name}`];
+    if (person != null) return { value: person, scope: "개인" };
     const all = data.estimates[`${company}|||${project}`];
-    if (all != null) return `${all.toLocaleString("ko-KR")}만(전체)`;
-    return "-";
+    if (all != null) return { value: all, scope: "전체" };
+    return { value: null, scope: null };
+  };
+
+  const estimateText = (company: string, project: string) => {
+    const { value, scope } = estimateInfo(company, project);
+    if (value == null) return "-";
+    return `${value.toLocaleString("ko-KR")}만${scope === "전체" ? "(전체)" : ""}`;
   };
 
   const getBreakdown = (
@@ -119,8 +128,37 @@ export function ProjectsView({ name }: { name: string }) {
       role
     );
 
+  /** 화면 표와 엑셀이 공유하는 작업항목 블록 (디자인/퍼블 분리 포함) */
+  const buildBlocks = (
+    g: AggGroup
+  ): { rows: TaskStageRow[]; role: "디자인" | "퍼블" | null }[] => {
+    const fallback: TaskStageRow[] = [
+      {
+        task: "-",
+        stage: "본작업",
+        hours: { ...g.stages },
+        total: g.total,
+        lastDate: g.lastDate,
+      },
+    ];
+    if (SPLIT_DESIGN_PUBLISH.has(g.project)) {
+      const designRows = getBreakdown(g.company, g.project, "디자인");
+      const publishRows = getBreakdown(g.company, g.project, "퍼블");
+      if (!designRows.length && !publishRows.length) {
+        return [{ rows: fallback, role: null }];
+      }
+      const blocks: { rows: TaskStageRow[]; role: "디자인" | "퍼블" | null }[] =
+        [];
+      if (designRows.length) blocks.push({ rows: designRows, role: "디자인" });
+      if (publishRows.length) blocks.push({ rows: publishRows, role: "퍼블" });
+      return blocks;
+    }
+    const plainRows = getBreakdown(g.company, g.project);
+    return [{ rows: plainRows.length ? plainRows : fallback, role: null }];
+  };
+
   const handleExport = () => {
-    exportAllTimeProjectsExcel(
+    void exportAllTimeProjectsExcel(
       name,
       statusFilter,
       monthFilter,
@@ -133,12 +171,14 @@ export function ProjectsView({ name }: { name: string }) {
           data.projectTypesByMajor
         );
         const done = getStatus(g.company, g.project) === "완료";
+        const { value, scope } = estimateInfo(g.company, g.project);
         return {
+          category: g.project,
           company: g.company,
-          major:
-            catInfo.major === "동영상" ? "영상" : catInfo.major || "",
-          project: g.project,
-          estimate: estimateText(g.company, g.project),
+          major: catInfo.major === "동영상" ? "영상" : catInfo.major || "",
+          sub: catInfo.sub || g.project,
+          estimate: value,
+          estimateScope: scope,
           stages: g.stages,
           status: done ? "완료" : "진행중",
           total: g.total,
@@ -146,6 +186,14 @@ export function ProjectsView({ name }: { name: string }) {
             done && g.lastDate
               ? `${g.lastDate.slice(0, 7).replace("-", "년 ")}월`
               : "-",
+          items: buildBlocks(g).flatMap((b) =>
+            b.rows.map((r) => ({
+              task: r.task,
+              role: b.role,
+              stages: r.hours,
+              total: r.total,
+            }))
+          ),
         };
       }),
       grandTotal
@@ -193,49 +241,7 @@ export function ProjectsView({ name }: { name: string }) {
       );
     }
 
-    const split = SPLIT_DESIGN_PUBLISH.has(g.project);
-    let designRows: TaskStageRow[] = [];
-    let publishRows: TaskStageRow[] = [];
-    let plainRows: TaskStageRow[] = [];
-
-    if (split) {
-      designRows = getBreakdown(g.company, g.project, "디자인");
-      publishRows = getBreakdown(g.company, g.project, "퍼블");
-      if (!designRows.length && !publishRows.length) {
-        plainRows = [
-          {
-            task: "-",
-            stage: "본작업",
-            hours: { ...g.stages },
-            total: g.total,
-            lastDate: g.lastDate,
-          },
-        ];
-      }
-    } else {
-      plainRows = getBreakdown(g.company, g.project);
-      if (!plainRows.length) {
-        plainRows = [
-          {
-            task: "-",
-            stage: "본작업",
-            hours: { ...g.stages },
-            total: g.total,
-            lastDate: g.lastDate,
-          },
-        ];
-      }
-    }
-
-    const blocks: { rows: TaskStageRow[]; role: string | null }[] = [];
-    if (split) {
-      if (designRows.length) blocks.push({ rows: designRows, role: "디자인" });
-      if (publishRows.length) blocks.push({ rows: publishRows, role: "퍼블" });
-      if (plainRows.length) blocks.push({ rows: plainRows, role: null });
-    } else {
-      blocks.push({ rows: plainRows, role: null });
-    }
-
+    const blocks = buildBlocks(g);
     const totalRowCount = blocks.reduce((n, b) => n + b.rows.length, 0);
     let projectFirst = true;
 

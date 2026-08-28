@@ -107,12 +107,15 @@ export const STAGE_FALLBACK_ROLE: Record<string, string> = {
   제작중: "퍼블",
 };
 
+/** 월간 엑셀 요약 행 라벨 매핑 */
 export const STAGE_TO_SUMMARY_ROW: Record<string, string> = {
   시안: "시안",
   본작업: "본작업",
   수정중: "수정",
-  제작중: "본작업",
+  제작중: "제작중",
 };
+
+export const MONTHLY_SUMMARY_ROWS = ["시안", "본작업", "수정", "제작중"];
 
 export const STAGE_RANK: Record<string, number> = {
   시안: 1,
