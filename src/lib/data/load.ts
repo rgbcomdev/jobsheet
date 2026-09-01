@@ -36,22 +36,26 @@ export async function loadSeedFromPublic(): Promise<JobsheetSeed> {
   return res.json();
 }
 
-/** 페이지네이션 (id 있는 테이블). 무한루프 방지용 maxPages 포함. */
+/**
+ * 페이지네이션. 무한루프 방지용 maxPages 포함.
+ * orderCols 마지막에는 항상 id를 두어 정렬을 유일하게 만든다 (페이지 경계에서 중복·누락 방지).
+ */
 async function fetchAllById(
   supabase: SupabaseClient,
   table: string,
-  pageSize = 1000
+  pageSize = 1000,
+  orderCols: string[] = ["id"]
 ) {
   const rows: Record<string, unknown>[] = [];
   const maxPages = 50;
   for (let page = 0; page < maxPages; page++) {
     const from = page * pageSize;
     const to = from + pageSize - 1;
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
-      .order("id", { ascending: true })
-      .range(from, to);
+    let query = supabase.from(table).select("*");
+    for (const col of orderCols) {
+      query = query.order(col, { ascending: true });
+    }
+    const { data, error } = await query.range(from, to);
     if (error) throw error;
     if (!data?.length) break;
     rows.push(...data);
@@ -106,7 +110,7 @@ export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
     overrides,
   ] = await Promise.all([
     fetchOnce(supabase, "companies"),
-    fetchAllById(supabase, "entries"),
+    fetchAllById(supabase, "entries", 1000, ["date", "start_time", "id"]),
     fetchOnce(supabase, "project_statuses"),
     fetchOnce(supabase, "leaves"),
     fetchOnce(supabase, "public_duties"),

@@ -126,9 +126,9 @@ export function IndividualView({ name }: { name: string }) {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${pad(month)}-${pad(d)}`;
       const dow = new Date(year, month - 1, d).getDay();
-      const dayEntries = data.entries.filter(
-        (e) => e.date === dateStr && (e.owner || "") === name
-      );
+      const dayEntries = data.entries
+        .filter((e) => e.date === dateStr && (e.owner || "") === name)
+        .sort((a, b) => a.start.localeCompare(b.start));
       const leaveType = getLeave(name, dateStr);
       const publicDutyType = getPublicDuty(name, dateStr);
       const holidayName = data.holidays[dateStr];

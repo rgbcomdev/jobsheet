@@ -46,9 +46,9 @@ export function DayModal({ owner, date, open, onClose }: Props) {
   } = useJobsheet();
 
   const initial = useMemo(() => {
-    const existing = data.entries.filter(
-      (e) => e.date === date && (e.owner || "") === owner
-    );
+    const existing = data.entries
+      .filter((e) => e.date === date && (e.owner || "") === owner)
+      .sort((a, b) => a.start.localeCompare(b.start));
     if (existing.length) return existing.map((e) => ({ ...e }));
     return [
       {
