@@ -218,6 +218,7 @@ function buildMonthlySheet(
   };
 
   let monthOt = 0;
+  let monthTotal = 0;
 
   const titleRow = addRow([`${year}년 ${month}월 업무일지`], false);
   ws.getCell(titleRow, TOTAL_COL).value = `${owner}.RGBcom`;
@@ -321,12 +322,20 @@ function buildMonthlySheet(
     });
 
     const totalRow: Cell[] = ["총계"];
-    perDay.forEach((day) => totalRow.push(hoursToTimeValue(day.total), null));
+    let weekTotal = 0;
+    perDay.forEach((day) => {
+      totalRow.push(hoursToTimeValue(day.total), null);
+      weekTotal += day.total;
+    });
+    while (totalRow.length < TOTAL_COL - 1) totalRow.push(null);
+    totalRow.push(hoursToTimeValue(weekTotal));
     const totalIdx = addRow(totalRow);
     perDay.forEach((_, dayIdx) =>
       hourCells.push({ row: totalIdx, col: 2 + dayIdx * 2 })
     );
+    hourCells.push({ row: totalIdx, col: TOTAL_COL });
     headerCells.push({ row: totalIdx, col: 1 });
+    monthTotal += weekTotal;
 
     const otRow: Cell[] = ["연장근로"];
     let weekOt = 0;
@@ -350,13 +359,18 @@ function buildMonthlySheet(
     addRow([], false);
   });
 
-  const monthRow: Cell[] = ["이번달 연장근로 합계"];
-  while (monthRow.length < TOTAL_COL - 1) monthRow.push(null);
-  monthRow.push(hoursToTimeValue(monthOt));
-  const monthIdx = addRow(monthRow);
-  hourCells.push({ row: monthIdx, col: TOTAL_COL });
-  headerCells.push({ row: monthIdx, col: 1 });
-  ws.mergeCells(monthIdx, 1, monthIdx, 2);
+  const pushMonthRow = (label: string, hours: number) => {
+    const row: Cell[] = [label];
+    while (row.length < TOTAL_COL - 1) row.push(null);
+    row.push(hoursToTimeValue(hours));
+    const idx = addRow(row);
+    hourCells.push({ row: idx, col: TOTAL_COL });
+    headerCells.push({ row: idx, col: 1 });
+    ws.mergeCells(idx, 1, idx, 2);
+    return idx;
+  };
+  pushMonthRow("이번달 근무 합계", monthTotal);
+  pushMonthRow("이번달 연장근로 합계", monthOt);
 
   for (let c = 1; c <= TOTAL_COL; c++) {
     if (c === 1) ws.getColumn(c).width = 16;
