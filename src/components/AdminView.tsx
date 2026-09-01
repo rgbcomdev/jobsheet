@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useJobsheet } from "@/context/JobsheetContext";
-import { MAJORS, DEFAULT_PROJECT_TYPES_BY_MAJOR } from "@/lib/constants";
+import {
+  MAJORS,
+  DEFAULT_PROJECT_TYPES_BY_MAJOR,
+  GRADE_OPTIONS,
+  STAFF_ROLES,
+} from "@/lib/constants";
 import { buildBackupPayload, downloadBackup, parseBackupFile } from "@/lib/backup";
 import { exportAllMonthlyExcel } from "@/lib/excel";
 
@@ -27,11 +32,14 @@ export function AdminView() {
   const [showEmpReg, setShowEmpReg] = useState(false);
   const [regName, setRegName] = useState("");
   const [regTeam, setRegTeam] = useState("디자인");
+  const [regGrade, setRegGrade] = useState("사원");
+  const [regRole, setRegRole] = useState("");
   const [editName, setEditName] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     team: "디자인",
     grade: "사원",
+    role: "",
     isFormer: false,
   });
   const [dragName, setDragName] = useState<string | null>(null);
@@ -57,7 +65,7 @@ export function AdminView() {
   const employeesByTeam = useMemo(() => {
     const out: Record<
       string,
-      { name: string; team: string; grade: string; isFormer: boolean }[]
+      { name: string; team: string; grade: string; role: string; isFormer: boolean }[]
     > = {};
     for (const team of TEAM_ORDER) {
       const names = data.employees[team] || [];
@@ -70,6 +78,7 @@ export function AdminView() {
           name,
           team,
           grade: data.staffGrade[name] || "사원",
+          role: data.staffRole[name] || "",
           isFormer: data.formerEmployees.includes(name),
         }));
     }
@@ -85,11 +94,18 @@ export function AdminView() {
           name,
           team,
           grade: data.staffGrade[name] || "사원",
+          role: data.staffRole[name] || "",
           isFormer: data.formerEmployees.includes(name),
         }));
     });
     return out;
-  }, [data.employees, data.staffGrade, data.formerEmployees, showFormer]);
+  }, [
+    data.employees,
+    data.staffGrade,
+    data.staffRole,
+    data.formerEmployees,
+    showFormer,
+  ]);
 
   const employeeCount = useMemo(
     () => Object.values(employeesByTeam).reduce((n, rows) => n + rows.length, 0),
@@ -326,17 +342,55 @@ export function AdminView() {
                   <option value="영상">영상팀</option>
                 </select>
               </label>
+              <label className="estimate-field">
+                <span>직급</span>
+                <select
+                  value={regGrade}
+                  onChange={(e) => setRegGrade(e.target.value)}
+                >
+                  {GRADE_OPTIONS.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="estimate-field">
+                <span>역할</span>
+                <select
+                  value={regRole}
+                  onChange={(e) => setRegRole(e.target.value)}
+                  title="KPI에서 디자인/퍼블 시간을 나누는 기준입니다"
+                >
+                  <option value="">미지정</option>
+                  {STAFF_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 className="backup-btn admin-reg-submit"
                 onClick={async () => {
                   if (!regName.trim()) return;
-                  await upsertEmployee({
-                    name: regName.trim(),
-                    team: regTeam,
-                    grade: "사원",
-                  });
-                  setRegName("");
+                  try {
+                    await upsertEmployee({
+                      name: regName.trim(),
+                      team: regTeam,
+                      grade: regGrade,
+                      role: regRole,
+                    });
+                    setRegName("");
+                    setRegGrade("사원");
+                    setRegRole("");
+                  } catch (err) {
+                    console.error(err);
+                    alert(
+                      err instanceof Error ? err.message : "등록에 실패했습니다."
+                    );
+                  }
                 }}
               >
                 등록
@@ -360,6 +414,7 @@ export function AdminView() {
                       <th className="col-drag" aria-label="순서" />
                       <th>이름</th>
                       <th>직급</th>
+                      <th>역할</th>
                       <th>KPI</th>
                       <th>수정</th>
                       <th>삭제</th>
@@ -414,6 +469,15 @@ export function AdminView() {
                         </td>
                         <td>{r.name}</td>
                         <td>{r.grade}</td>
+                        <td
+                          style={
+                            r.role
+                              ? undefined
+                              : { color: "var(--text-muted)", fontSize: 12 }
+                          }
+                        >
+                          {r.role || "미지정"}
+                        </td>
                         <td>
                           <Link
                             href={`/e/${encodeURIComponent(r.name)}`}
@@ -432,6 +496,7 @@ export function AdminView() {
                                 name: r.name,
                                 team: r.team,
                                 grade: r.grade,
+                                role: r.role,
                                 isFormer: r.isFormer,
                               });
                             }}
@@ -589,7 +654,7 @@ export function AdminView() {
               </button>
             </div>
             <p className="modal-sub">
-              이름·팀·직급을 바꾼 뒤 확정을 누르면 저장됩니다.
+              이름·팀·직급·역할을 바꾼 뒤 확정을 누르면 저장됩니다.
             </p>
             <div className="emp-edit-form">
               <div className="emp-edit-row">
@@ -621,17 +686,26 @@ export function AdminView() {
                     setEditForm((f) => ({ ...f, grade: e.target.value }))
                   }
                 >
-                  {[
-                    "사원",
-                    "주임",
-                    "대리",
-                    "대리과장",
-                    "과장",
-                    "차장",
-                    "팀장",
-                  ].map((g) => (
+                  {GRADE_OPTIONS.map((g) => (
                     <option key={g} value={g}>
                       {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="emp-edit-row">
+                <label>역할</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, role: e.target.value }))
+                  }
+                  title="KPI에서 디자인/퍼블 시간을 나누는 기준입니다"
+                >
+                  <option value="">미지정</option>
+                  {STAFF_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
                     </option>
                   ))}
                 </select>
@@ -655,14 +729,22 @@ export function AdminView() {
                 type="button"
                 className="modal-save"
                 onClick={async () => {
-                  await upsertEmployee({
-                    name: editForm.name.trim(),
-                    team: editForm.team,
-                    grade: editForm.grade,
-                    oldName: editName,
-                    isFormer: editForm.isFormer,
-                  });
-                  setEditName(null);
+                  try {
+                    await upsertEmployee({
+                      name: editForm.name.trim(),
+                      team: editForm.team,
+                      grade: editForm.grade,
+                      role: editForm.role,
+                      oldName: editName,
+                      isFormer: editForm.isFormer,
+                    });
+                    setEditName(null);
+                  } catch (err) {
+                    console.error(err);
+                    alert(
+                      err instanceof Error ? err.message : "저장에 실패했습니다."
+                    );
+                  }
                 }}
               >
                 확정

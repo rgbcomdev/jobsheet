@@ -59,6 +59,20 @@ export const LEAVE_LABEL_SHORT: Record<string, string> = {
   오후반반차: "오후반반차",
 };
 
+/** KPI 디자인/퍼블 집계 기준 역할. "겸업"은 작업내용으로 세분화한다 */
+export const STAFF_ROLES = ["디자인", "퍼블", "겸업"] as const;
+
+/** 직원 등록·수정에서 고르는 직급 (낮은 직급부터) */
+export const GRADE_OPTIONS = [
+  "사원",
+  "주임",
+  "대리",
+  "대리과장",
+  "과장",
+  "차장",
+  "팀장",
+] as const;
+
 export const GRADE_ORDER: Record<string, number> = {
   팀장: 0,
   차장: 1,

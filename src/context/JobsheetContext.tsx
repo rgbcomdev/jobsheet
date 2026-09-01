@@ -40,6 +40,7 @@ type Ctx = {
     name: string;
     team: string;
     grade: string;
+    role?: string;
     oldName?: string;
     isFormer?: boolean;
   }) => Promise<void>;
@@ -297,6 +298,7 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
       name: string;
       team: string;
       grade: string;
+      role?: string;
       oldName?: string;
       isFormer?: boolean;
     }) => {
@@ -311,10 +313,14 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
         employees[emp.team].push(emp.name);
 
         const staffGrade = { ...prev.staffGrade };
+        const staffRole = { ...prev.staffRole };
         if (emp.oldName && emp.oldName !== emp.name) {
           delete staffGrade[emp.oldName];
+          delete staffRole[emp.oldName];
         }
         staffGrade[emp.name] = emp.grade;
+        if (emp.role) staffRole[emp.name] = emp.role;
+        else delete staffRole[emp.name];
 
         let formerEmployees = [...prev.formerEmployees];
         if (emp.oldName && emp.oldName !== emp.name) {
@@ -340,6 +346,7 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           employees,
           staffGrade,
+          staffRole,
           formerEmployees,
           entries,
         };
@@ -348,25 +355,38 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
       const sb = getSupabase();
       if (sb) {
         if (emp.oldName && emp.oldName !== emp.name) {
-          await sb.from("employees").delete().eq("name", emp.oldName);
-          await sb
+          const del = await sb
+            .from("employees")
+            .delete()
+            .eq("name", emp.oldName);
+          if (del.error) {
+            throw new Error(`이전 이름 삭제 실패: ${del.error.message}`);
+          }
+          const upd = await sb
             .from("entries")
             .update({ owner: emp.name })
             .eq("owner", emp.oldName);
+          if (upd.error) {
+            throw new Error(`업무일지 담당자 변경 실패: ${upd.error.message}`);
+          }
         }
         const { count } = await sb
           .from("employees")
           .select("*", { count: "exact", head: true })
           .eq("team", emp.team);
-        await sb.from("employees").upsert({
-          name: emp.name,
-          team: emp.team,
-          grade: emp.grade,
-          is_former: !!emp.isFormer,
-          ...(!emp.oldName
-            ? { sort_order: count ?? 0 }
-            : {}),
-        });
+        // name이 PK가 아니므로 충돌 기준을 명시해야 한다 (없으면 id 기준이라 unique 위반)
+        const { error } = await sb.from("employees").upsert(
+          {
+            name: emp.name,
+            team: emp.team,
+            grade: emp.grade,
+            role: emp.role || null,
+            is_former: !!emp.isFormer,
+            ...(!emp.oldName ? { sort_order: count ?? 0 } : {}),
+          },
+          { onConflict: "name" }
+        );
+        if (error) throw new Error(`직원 저장 실패: ${error.message}`);
       }
     },
     []
