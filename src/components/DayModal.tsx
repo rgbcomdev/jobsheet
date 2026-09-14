@@ -757,7 +757,16 @@ export function DayModal({ owner, date, open, onClose }: Props) {
                     {done ? "완료됨" : "완료 처리"}
                   </button>
                   {e.company && e.project && (
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-muted)",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
                       {STAGE_BADGE_TEXT[e.stage] || e.stage} ·{" "}
                       {summarizeNoteForCell(e.note, e.company) || "내용 없음"}
                     </span>

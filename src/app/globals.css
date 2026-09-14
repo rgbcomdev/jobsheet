@@ -110,7 +110,7 @@
   .cal-weekdays div.sun { color: var(--danger); }
   .cal-weekdays div.sat { color: var(--blue); }
 
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 116px; gap: 5px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 139px; gap: 5px; }
   .cal-cell {
     border: 0.5px solid var(--border); border-radius: 8px; padding: 6px 8px;
     background: #fafaf8; cursor: pointer; display: flex; flex-direction: column;
@@ -675,6 +675,8 @@
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; }
 .wrap { max-width: 1600px; width: 100%; padding: 0 16px; }
+/* 개인 캘린더 페이지: 셀 하나에 업무 3건이 보이도록 가로·세로 1.2배 */
+.wrap.wrap-wide { max-width: 1920px; }
 @media (max-width: 1640px) {
   .wrap { width: 100%; }
 }

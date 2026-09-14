@@ -294,7 +294,7 @@ export function IndividualView({ name }: { name: string }) {
     });
 
   return (
-    <div className="wrap">
+    <div className="wrap wrap-wide">
       <div className="topbar">
         <div className="who">
           <Link href="/" className="back-btn">

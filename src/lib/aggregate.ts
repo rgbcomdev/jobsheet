@@ -9,9 +9,8 @@ export function summarizeNoteForCell(note: string, company: string) {
     const esc = company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     text = text.replace(new RegExp("^" + esc + "[_\\s]*"), "");
   }
-  text = text.trim();
-  if (!text) return "";
-  return text.length > 16 ? text.slice(0, 16) + "…" : text;
+  // 길이는 자르지 않는다 — 표시 폭에 맞춘 말줄임은 CSS(text-overflow)가 처리
+  return text.trim();
 }
 
 export function stripPrefixOnly(note: string, company: string) {
