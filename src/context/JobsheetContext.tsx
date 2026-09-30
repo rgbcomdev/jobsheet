@@ -11,7 +11,12 @@ import React, {
 import type { CompanyInfo, JobsheetSeed, WorkEntry } from "@/lib/types";
 import { loadJobsheetData } from "@/lib/data/load";
 import { restoreBackupToSupabase } from "@/lib/data/restore";
-import { GRADE_ORDER, leaveKey, projectKey } from "@/lib/constants";
+import {
+  FIXED_HOLIDAYS,
+  GRADE_ORDER,
+  leaveKey,
+  projectKey,
+} from "@/lib/constants";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Ctx = {
@@ -49,6 +54,15 @@ type Ctx = {
   deleteCompany: (name: string) => Promise<void>;
   reorderEmployees: (team: string, orderedNames: string[]) => Promise<void>;
   replaceFromBackup: (partial: Partial<JobsheetSeed>) => Promise<void>;
+  upsertHoliday: (
+    date: string,
+    name: string,
+    companyLeave?: boolean
+  ) => Promise<{ leavesAdded: number }>;
+  deleteHoliday: (date: string, removeLeaves?: boolean) => Promise<void>;
+  addFixedHolidays: (
+    year: number
+  ) => Promise<{ added: number; skipped: number }>;
   activeEmployeesByTeam: Record<string, string[]>;
   allEmployeeNames: string[];
   sortByGradeDesc: (names: string[]) => string[];
@@ -480,6 +494,125 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
     if (sb) await sb.from("companies").delete().eq("name", name);
   }, []);
 
+  /** 휴일 등록·수정. companyLeave면 재직 직원 중 그날 휴가가 없는 사람에게 연차를 넣는다 */
+  const upsertHoliday = useCallback(
+    async (date: string, name: string, companyLeave = false) => {
+      const label = name.trim();
+      if (!date || !label) throw new Error("날짜와 이름을 입력해주세요.");
+      const targets = companyLeave
+        ? Object.values(data.employees)
+            .flat()
+            .filter(
+              (n) =>
+                !data.formerEmployees.includes(n) &&
+                !data.leaveData[leaveKey(n, date)]
+            )
+        : [];
+
+      setData((prev) => {
+        const leaveDataNext = { ...prev.leaveData };
+        targets.forEach((n) => {
+          leaveDataNext[leaveKey(n, date)] = "연차";
+        });
+        return {
+          ...prev,
+          holidays: { ...prev.holidays, [date]: label },
+          leaveData: leaveDataNext,
+        };
+      });
+
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb
+          .from("holidays")
+          .upsert({ date, name: label }, { onConflict: "date" });
+        if (error) throw new Error(`휴일 저장 실패: ${error.message}`);
+        if (targets.length) {
+          const res = await sb.from("leaves").upsert(
+            targets.map((n) => ({
+              employee_name: n,
+              date,
+              leave_type: "연차",
+            })),
+            { onConflict: "employee_name,date", ignoreDuplicates: true }
+          );
+          if (res.error) {
+            throw new Error(`전 직원 연차 등록 실패: ${res.error.message}`);
+          }
+        }
+      }
+      return { leavesAdded: targets.length };
+    },
+    [data.employees, data.formerEmployees, data.leaveData]
+  );
+
+  const deleteHoliday = useCallback(
+    async (date: string, removeLeaves = false) => {
+      setData((prev) => {
+        const holidays = { ...prev.holidays };
+        delete holidays[date];
+        let leaveData = prev.leaveData;
+        if (removeLeaves) {
+          leaveData = { ...prev.leaveData };
+          Object.keys(leaveData).forEach((k) => {
+            if (k.endsWith(`|||${date}`) && leaveData[k] === "연차") {
+              delete leaveData[k];
+            }
+          });
+        }
+        return { ...prev, holidays, leaveData };
+      });
+
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("holidays").delete().eq("date", date);
+        if (error) throw new Error(`휴일 삭제 실패: ${error.message}`);
+        if (removeLeaves) {
+          const res = await sb
+            .from("leaves")
+            .delete()
+            .eq("date", date)
+            .eq("leave_type", "연차");
+          if (res.error) {
+            throw new Error(`연차 삭제 실패: ${res.error.message}`);
+          }
+        }
+      }
+    },
+    []
+  );
+
+  /** 날짜가 고정된 공휴일만 그 해에 한 번에 넣는다 (이미 있는 날짜는 건너뜀) */
+  const addFixedHolidays = useCallback(
+    async (year: number) => {
+      const rows = FIXED_HOLIDAYS.map((h) => ({
+        date: `${year}-${h.md}`,
+        name: h.name,
+      })).filter((r) => !data.holidays[r.date]);
+      if (!rows.length) {
+        return { added: 0, skipped: FIXED_HOLIDAYS.length };
+      }
+
+      setData((prev) => {
+        const holidays = { ...prev.holidays };
+        rows.forEach((r) => {
+          holidays[r.date] = r.name;
+        });
+        return { ...prev, holidays };
+      });
+
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb
+          .from("holidays")
+          .upsert(rows, { onConflict: "date", ignoreDuplicates: true });
+        if (error) throw new Error(`공휴일 일괄 등록 실패: ${error.message}`);
+      }
+      return { added: rows.length, skipped: FIXED_HOLIDAYS.length - rows.length };
+    },
+    [data.holidays]
+  );
+
   const replaceFromBackup = useCallback(async (partial: Partial<JobsheetSeed>) => {
     let next: JobsheetSeed | null = null;
     setData((prev) => {
@@ -561,6 +694,9 @@ export function JobsheetProvider({ children }: { children: React.ReactNode }) {
     deleteCompany,
     reorderEmployees,
     replaceFromBackup,
+    upsertHoliday,
+    deleteHoliday,
+    addFixedHolidays,
     activeEmployeesByTeam,
     allEmployeeNames,
     sortByGradeDesc,

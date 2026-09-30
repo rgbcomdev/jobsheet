@@ -24,6 +24,9 @@ export function AdminView() {
     upsertCompany,
     reorderEmployees,
     replaceFromBackup,
+    upsertHoliday,
+    deleteHoliday,
+    addFixedHolidays,
     activeEmployeesByTeam,
   } = useJobsheet();
   const router = useRouter();
@@ -61,6 +64,10 @@ export function AdminView() {
   const [exportMonth, setExportMonth] = useState("");
   const [exporting, setExporting] = useState(false);
   const [showCompanyList, setShowCompanyList] = useState(false);
+  const [holidayYear, setHolidayYear] = useState(new Date().getFullYear());
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayName, setHolidayName] = useState("");
+  const [holidayAllLeave, setHolidayAllLeave] = useState(false);
 
   const employeesByTeam = useMemo(() => {
     const out: Record<
@@ -154,6 +161,105 @@ export function AdminView() {
     () => Object.values(activeEmployeesByTeam).flat(),
     [activeEmployeesByTeam]
   );
+
+  const holidayYears = useMemo(() => {
+    const now = new Date().getFullYear();
+    const set = new Set<number>([now, now + 1]);
+    Object.keys(data.holidays).forEach((d) => set.add(Number(d.slice(0, 4))));
+    return [...set].sort((a, b) => b - a);
+  }, [data.holidays]);
+
+  const holidayRows = useMemo(() => {
+    const WD = ["일", "월", "화", "수", "목", "금", "토"];
+    return Object.entries(data.holidays)
+      .filter(([d]) => d.startsWith(String(holidayYear)))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, name]) => {
+        const [y, m, dd] = date.split("-").map(Number);
+        const leaveCount = Object.keys(data.leaveData).filter(
+          (k) => k.endsWith(`|||${date}`) && data.leaveData[k] === "연차"
+        ).length;
+        return {
+          date,
+          name,
+          dow: WD[new Date(y, m - 1, dd).getDay()],
+          leaveCount,
+        };
+      });
+  }, [data.holidays, data.leaveData, holidayYear]);
+
+  const handleAddHoliday = async () => {
+    if (!holidayDate || !holidayName.trim()) {
+      alert("날짜와 휴일 이름을 입력해주세요.");
+      return;
+    }
+    try {
+      const { leavesAdded } = await upsertHoliday(
+        holidayDate,
+        holidayName.trim(),
+        holidayAllLeave
+      );
+      setHolidayYear(Number(holidayDate.slice(0, 4)));
+      setHolidayDate("");
+      setHolidayName("");
+      setHolidayAllLeave(false);
+      if (holidayAllLeave) {
+        alert(
+          leavesAdded
+            ? `휴일을 등록하고 ${leavesAdded}명에게 연차를 넣었습니다.
+(이미 휴가가 있던 직원은 그대로 두었습니다)`
+            : "휴일을 등록했습니다. 이미 모든 직원에게 그날 휴가가 있어 새로 넣은 연차는 없습니다."
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "휴일 등록에 실패했습니다.");
+    }
+  };
+
+  const handleDeleteHoliday = async (date: string, leaveCount: number) => {
+    if (!confirm(`${date} 휴일을 삭제할까요?`)) return;
+    let removeLeaves = false;
+    if (leaveCount > 0) {
+      removeLeaves = confirm(
+        `이 날짜에 등록된 연차 ${leaveCount}건도 함께 삭제할까요?
+` +
+          `[확인] 연차도 삭제  /  [취소] 휴일만 삭제
+
+` +
+          `※ 개인이 따로 쓴 연차도 함께 지워집니다.`
+      );
+    }
+    try {
+      await deleteHoliday(date, removeLeaves);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "휴일 삭제에 실패했습니다.");
+    }
+  };
+
+  const handleAddFixedHolidays = async () => {
+    if (
+      !confirm(
+        `${holidayYear}년 고정 공휴일을 추가할까요?
+이미 등록된 날짜는 건너뜁니다.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const { added, skipped } = await addFixedHolidays(holidayYear);
+      alert(
+        added
+          ? `${holidayYear}년 공휴일 ${added}일을 추가했습니다.${skipped ? `
+(이미 있던 ${skipped}일은 건너뜀)` : ""}`
+          : `${holidayYear}년 고정 공휴일이 이미 모두 등록되어 있습니다.`
+      );
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "일괄 추가에 실패했습니다.");
+    }
+  };
 
   const handleExportAll = async () => {
     const ym = exportMonth || entryMonths[0];
@@ -638,6 +744,107 @@ export function AdminView() {
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      <div className="admin-page-section">
+        <h4>
+          휴일 관리{" "}
+          <span className="admin-count-pill">
+            {holidayRows.length}일 / {holidayYear}년
+          </span>
+          <div className="admin-h4-actions">
+            <select
+              value={holidayYear}
+              onChange={(e) => setHolidayYear(Number(e.target.value))}
+            >
+              {holidayYears.map((y) => (
+                <option key={y} value={y}>
+                  {y}년
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="backup-btn"
+              title="신정·삼일절·근로자의날·어린이날·현충일·광복절·개천절·한글날·성탄절을 한 번에 넣습니다"
+              onClick={handleAddFixedHolidays}
+            >
+              고정 공휴일 일괄 추가
+            </button>
+          </div>
+        </h4>
+        <p className="admin-sub">
+          + 휴일 등록 (같은 날짜를 다시 등록하면 이름이 바뀝니다)
+        </p>
+        <div className="reg-row">
+          <input
+            type="date"
+            value={holidayDate}
+            onChange={(e) => setHolidayDate(e.target.value)}
+          />
+          <input
+            placeholder="휴일 이름 (예: 설날, 창립기념일)"
+            value={holidayName}
+            onChange={(e) => setHolidayName(e.target.value)}
+          />
+          <label className="holiday-check">
+            <input
+              type="checkbox"
+              checked={holidayAllLeave}
+              onChange={(e) => setHolidayAllLeave(e.target.checked)}
+            />
+            전 직원 연차로 등록
+          </label>
+          <button
+            type="button"
+            className="backup-btn"
+            onClick={handleAddHoliday}
+          >
+            등록
+          </button>
+        </div>
+        {holidayRows.length > 0 && (
+          <table className="agg admin-list-table" style={{ marginTop: 14 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 160 }}>날짜</th>
+                <th>이름</th>
+                <th style={{ width: 110 }}>전 직원 연차</th>
+                <th style={{ width: 90 }}>삭제</th>
+              </tr>
+            </thead>
+            <tbody>
+              {holidayRows.map((h) => (
+                <tr key={h.date}>
+                  <td>
+                    {Number(h.date.slice(5, 7))}월 {Number(h.date.slice(8, 10))}
+                    일 ({h.dow})
+                  </td>
+                  <td>{h.name}</td>
+                  <td
+                    style={{
+                      color: h.leaveCount
+                        ? "var(--text-secondary)"
+                        : "var(--text-muted)",
+                      fontSize: 12,
+                    }}
+                  >
+                    {h.leaveCount ? `${h.leaveCount}명` : "-"}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="del-row-btn"
+                      onClick={() => handleDeleteHoliday(h.date, h.leaveCount)}
+                    >
+                      삭제
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 

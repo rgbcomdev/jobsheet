@@ -62,6 +62,19 @@ export const LEAVE_LABEL_SHORT: Record<string, string> = {
 /** KPI 디자인/퍼블 집계 기준 역할. "겸업"은 작업내용으로 세분화한다 */
 export const STAFF_ROLES = ["디자인", "퍼블", "겸업"] as const;
 
+/** 날짜가 매년 고정인 공휴일 (설·추석·부처님오신날·대체공휴일은 음력이라 수동 입력) */
+export const FIXED_HOLIDAYS: { md: string; name: string }[] = [
+  { md: "01-01", name: "신정" },
+  { md: "03-01", name: "삼일절" },
+  { md: "05-01", name: "근로자의날" },
+  { md: "05-05", name: "어린이날" },
+  { md: "06-06", name: "현충일" },
+  { md: "08-15", name: "광복절" },
+  { md: "10-03", name: "개천절" },
+  { md: "10-09", name: "한글날" },
+  { md: "12-25", name: "성탄절" },
+];
+
 /** 직원 등록·수정에서 고르는 직급 (낮은 직급부터) */
 export const GRADE_OPTIONS = [
   "사원",
