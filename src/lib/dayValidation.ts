@@ -30,6 +30,22 @@ export function computeDayTotalHours(
   );
 }
 
+/** 저녁 휴게시간과 겹치는 입력을 실제 근무 구간으로 나눈다. */
+export function splitEveningBreak(entry: WorkEntry): WorkEntry[] {
+  const { start, end } = entry;
+  if (end <= start || start >= "19:00" || end <= "18:00") {
+    return [entry];
+  }
+
+  const before = start < "18:00" ? [{ ...entry, end: "18:00" }] : [];
+  const after = end > "19:00"
+    ? [{ ...entry, id: undefined, start: "19:00" }]
+    : [];
+
+  // 휴게시간만 선택한 행은 수정할 수 있도록 0시간 행으로 둔다.
+  return before.length || after.length ? [...before, ...after] : [entry];
+}
+
 export function getLeaveTimeBounds(type: string): {
   minStart?: string;
   maxEnd?: string;
@@ -69,7 +85,7 @@ export function clampEntryToLeaveBounds(
   if (bounds.minStart && entry.end <= bounds.minStart) return null;
   if (bounds.maxEnd && entry.start >= bounds.maxEnd) return null;
   const start = clampTimeToLeaveBounds(entry.start, bounds);
-  let end = clampTimeToLeaveBounds(entry.end, bounds);
+  const end = clampTimeToLeaveBounds(entry.end, bounds);
   if (end <= start) return null;
   return { ...entry, start, end };
 }

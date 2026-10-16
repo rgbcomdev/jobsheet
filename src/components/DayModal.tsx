@@ -23,6 +23,7 @@ import {
   formatDayValidationError,
   getLeaveTimeBounds,
   getLeaveWorkWindowLabel,
+  splitEveningBreak,
 } from "@/lib/dayValidation";
 import { stageRuleWarning } from "@/lib/stageRules";
 import { CompanyAutocomplete } from "./CompanyAutocomplete";
@@ -49,7 +50,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
     const existing = data.entries
       .filter((e) => e.date === date && (e.owner || "") === owner)
       .sort((a, b) => a.start.localeCompare(b.start));
-    if (existing.length) return existing.map((e) => ({ ...e }));
+    if (existing.length) return existing.flatMap((e) => splitEveningBreak({ ...e }));
     return [
       {
         date,
@@ -225,8 +226,8 @@ export function DayModal({ owner, date, open, onClose }: Props) {
 
   const updateRow = (i: number, patch: Partial<WorkEntry>) => {
     setRows((prev) =>
-      prev.map((r, idx) => {
-        if (idx !== i) return r;
+      prev.flatMap((r, idx) => {
+        if (idx !== i) return [r];
         const bounds = getLeaveTimeBounds(getLeave(owner, date));
         const next = { ...r, ...patch };
         next.start = clampTimeToLeaveBounds(next.start, bounds);
@@ -238,7 +239,9 @@ export function DayModal({ owner, date, open, onClose }: Props) {
             next.start = bounds.minStart;
           }
         }
-        return next;
+        return "start" in patch || "end" in patch
+          ? splitEveningBreak(next)
+          : [next];
       })
     );
   };
