@@ -177,7 +177,7 @@ function GradeControls({
 
 export function EstimatesView() {
   const { loading, data } = useJobsheet();
-  const [tab, setTab] = useState<"디자인" | "동영상">("디자인");
+  const [tab, setTab] = useState<"디자인" | "동영상" | "기획/마케팅">("디자인");
   const [calcCategory, setCalcCategory] = useState("홈페이지");
   const [calcBudget, setCalcBudget] = useState("500");
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
@@ -372,6 +372,13 @@ export function EstimatesView() {
           onClick={() => setTab("동영상")}
         >
           영상팀
+        </button>
+        <button
+          type="button"
+          className={"team-tab-btn" + (tab === "기획/마케팅" ? " active" : "")}
+          onClick={() => setTab("기획/마케팅")}
+        >
+          기획/마케팅팀
         </button>
       </div>
 

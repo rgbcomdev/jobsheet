@@ -542,7 +542,7 @@ export function DayModal({ owner, date, open, onClose }: Props) {
 
   const normalizeMajor = (major?: string) => {
     if (major === "영상") return "동영상";
-    if (major === "동영상" || major === "디자인") return major;
+    if ((MAJORS as readonly string[]).includes(major || "")) return major!;
     return "";
   };
 

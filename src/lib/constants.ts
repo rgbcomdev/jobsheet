@@ -39,6 +39,8 @@ export const FULL_CATEGORY_ORDER = [
   "3D영상",
   "촬영영상",
   "모션영상",
+  "기획",
+  "마케팅",
 ] as const;
 
 export const LEAVE_TYPES = [
@@ -162,7 +164,7 @@ export const STAGE_BADGE_TEXT: Record<string, string> = {
   제작중: "제작",
 };
 
-export const MAJORS = ["디자인", "동영상"] as const;
+export const MAJORS = ["디자인", "동영상", "기획/마케팅"] as const;
 
 export const DEFAULT_PROJECT_TYPES_BY_MAJOR: Record<string, string[]> = {
   디자인: [
@@ -182,6 +184,7 @@ export const DEFAULT_PROJECT_TYPES_BY_MAJOR: Record<string, string[]> = {
     "RGB내부업무",
     "RGB외부업무",
   ],
+  "기획/마케팅": ["기획", "마케팅", "RGB내부업무", "RGB외부업무"],
 };
 
 export const DESIGN_GRID: [number, number][] = [

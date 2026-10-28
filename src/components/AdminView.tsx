@@ -1011,12 +1011,15 @@ export function AdminView() {
                   onChange={(e) => setAssigneePick(e.target.value)}
                 >
                   <option value="">미지정 (나중에 지정)</option>
-                  {[
-                    ...((assigneeModal.major === "동영상"
-                      ? activeEmployeesByTeam["영상"]
-                      : activeEmployeesByTeam["디자인"]) || []),
-                    ...(activeEmployeesByTeam["기획/마케팅"] || []),
-                  ].map((n) => (
+                  {(assigneeModal.major === "기획/마케팅"
+                    ? activeEmployeesByTeam["기획/마케팅"] || []
+                    : [
+                        ...((assigneeModal.major === "동영상"
+                          ? activeEmployeesByTeam["영상"]
+                          : activeEmployeesByTeam["디자인"]) || []),
+                        ...(activeEmployeesByTeam["기획/마케팅"] || []),
+                      ]
+                  ).map((n) => (
                     <option key={n} value={n}>
                       {n}
                     </option>

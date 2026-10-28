@@ -12,13 +12,14 @@ import {
 import { classifyDesignOrPublish, computeDuration, round1 } from "@/lib/time";
 import {
   DEFAULT_PROJECT_TYPES_BY_MAJOR,
+  MAJORS,
   STAGES,
   WORK_ROLES,
 } from "@/lib/constants";
 import { fmWon } from "@/lib/estimate";
 import { exportTeamKpiExcel } from "@/lib/excel";
 
-type TeamTab = "전체" | "디자인" | "동영상";
+type TeamTab = "전체" | "디자인" | "동영상" | "기획/마케팅";
 
 export function TeamKpiView() {
   const { loading, data, getStatus, setStatus, activeEmployeesByTeam } =
@@ -88,6 +89,7 @@ export function TeamKpiView() {
 
   const employeeOptions = useMemo(() => {
     const planning = activeEmployeesByTeam["기획/마케팅"] || [];
+    if (tab === "기획/마케팅") return planning;
     if (tab === "디자인")
       return [...(activeEmployeesByTeam["디자인"] || []), ...planning];
     if (tab === "동영상")
@@ -146,7 +148,8 @@ export function TeamKpiView() {
           data.projectTypesByMajor
         ).major;
         if (tab === "전체" && ma !== mb) {
-          return ma === "디자인" ? -1 : 1;
+          const order = MAJORS as readonly string[];
+          return order.indexOf(ma) - order.indexOf(mb);
         }
         return gb.total - ga.total;
       });
@@ -165,6 +168,7 @@ export function TeamKpiView() {
     let all = 0;
     let design = 0;
     let video = 0;
+    let planning = 0;
     Object.values(groups).forEach((g) => {
       all++;
       const { major } = deriveMajorSub(
@@ -175,8 +179,9 @@ export function TeamKpiView() {
       );
       if (g.project === "RGB내부업무" || major === "디자인") design++;
       if (g.project === "RGB내부업무" || major === "동영상") video++;
+      if (g.project === "RGB내부업무" || major === "기획/마케팅") planning++;
     });
-    return { all, design, video };
+    return { all, design, video, planning };
   }, [groups, data.companyCat, data.projectTypesByMajor]);
 
   if (loading) {
@@ -204,6 +209,7 @@ export function TeamKpiView() {
     { key: "전체", label: "전체", count: counts.all },
     { key: "디자인", label: "디자인팀", count: counts.design },
     { key: "동영상", label: "영상팀", count: counts.video },
+    { key: "기획/마케팅", label: "기획/마케팅팀", count: counts.planning },
   ];
 
   const handleExportExcel = () => {
@@ -312,7 +318,13 @@ export function TeamKpiView() {
     }
 
     const tabLabel =
-      tab === "전체" ? "전체" : tab === "디자인" ? "디자인팀" : "영상팀";
+      tab === "전체"
+        ? "전체"
+        : tab === "디자인"
+          ? "디자인팀"
+          : tab === "동영상"
+            ? "영상팀"
+            : "기획/마케팅팀";
     void exportTeamKpiExcel({
       startMonth: start,
       endMonth: end,
@@ -413,7 +425,9 @@ export function TeamKpiView() {
                   ? "디자인 전체"
                   : tab === "동영상"
                     ? "영상 전체"
-                    : "프로젝트 전체"}
+                    : tab === "기획/마케팅"
+                      ? "기획/마케팅 전체"
+                      : "프로젝트 전체"}
               </option>
               {projectOptions.map((p) => (
                 <option key={p} value={p}>
