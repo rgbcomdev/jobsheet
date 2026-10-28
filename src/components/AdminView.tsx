@@ -906,7 +906,16 @@ export function AdminView() {
                     setEditForm((f) => ({ ...f, grade: e.target.value }))
                   }
                 >
-                  {GRADE_OPTIONS.map((g) => (
+                  {/* 선택지에서 빠진 직급이어도 저장 시 다른 직급으로 바뀌지 않게 현재 값을 유지 */}
+                  {[
+                    ...(!editForm.grade ||
+                    (GRADE_OPTIONS as readonly string[]).includes(
+                      editForm.grade
+                    )
+                      ? []
+                      : [editForm.grade]),
+                    ...GRADE_OPTIONS,
+                  ].map((g) => (
                     <option key={g} value={g}>
                       {g}
                     </option>
