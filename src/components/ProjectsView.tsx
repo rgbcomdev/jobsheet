@@ -15,6 +15,8 @@ import {
   FULL_CATEGORY_ORDER,
   SPLIT_DESIGN_PUBLISH,
   STAGES,
+  WORK_ROLES,
+  type WorkRole,
 } from "@/lib/constants";
 import { round1 } from "@/lib/time";
 import { exportAllTimeProjectsExcel } from "@/lib/excel";
@@ -115,7 +117,7 @@ export function ProjectsView({ name }: { name: string }) {
   const getBreakdown = (
     company: string,
     project: string,
-    role?: "디자인" | "퍼블" | null
+    role?: WorkRole | null
   ) =>
     buildTaskStageBreakdown(
       data.entries,
@@ -131,7 +133,7 @@ export function ProjectsView({ name }: { name: string }) {
   /** 화면 표와 엑셀이 공유하는 작업항목 블록 (디자인/퍼블 분리 포함) */
   const buildBlocks = (
     g: AggGroup
-  ): { rows: TaskStageRow[]; role: "디자인" | "퍼블" | null }[] => {
+  ): { rows: TaskStageRow[]; role: WorkRole | null }[] => {
     const fallback: TaskStageRow[] = [
       {
         task: "-",
@@ -142,16 +144,11 @@ export function ProjectsView({ name }: { name: string }) {
       },
     ];
     if (SPLIT_DESIGN_PUBLISH.has(g.project)) {
-      const designRows = getBreakdown(g.company, g.project, "디자인");
-      const publishRows = getBreakdown(g.company, g.project, "퍼블");
-      if (!designRows.length && !publishRows.length) {
-        return [{ rows: fallback, role: null }];
-      }
-      const blocks: { rows: TaskStageRow[]; role: "디자인" | "퍼블" | null }[] =
-        [];
-      if (designRows.length) blocks.push({ rows: designRows, role: "디자인" });
-      if (publishRows.length) blocks.push({ rows: publishRows, role: "퍼블" });
-      return blocks;
+      const blocks = WORK_ROLES.map((role) => ({
+        rows: getBreakdown(g.company, g.project, role),
+        role,
+      })).filter((b) => b.rows.length);
+      return blocks.length ? blocks : [{ rows: fallback, role: null }];
     }
     const plainRows = getBreakdown(g.company, g.project);
     return [{ rows: plainRows.length ? plainRows : fallback, role: null }];

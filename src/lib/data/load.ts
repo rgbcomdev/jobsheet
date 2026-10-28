@@ -123,7 +123,7 @@ export async function loadFromSupabase(): Promise<JobsheetSeed | null> {
 
   const seed = emptySeed();
   const teamRank = (team: string) =>
-    team === "디자인" ? 0 : team === "영상" ? 1 : 2;
+    team === "디자인" ? 0 : team === "영상" ? 1 : team === "기획/마케팅" ? 2 : 3;
   const sortedEmployees = [...employees].sort((a, b) => {
     const ta = teamRank(String(a.team));
     const tb = teamRank(String(b.team));

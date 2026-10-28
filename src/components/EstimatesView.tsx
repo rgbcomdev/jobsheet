@@ -20,6 +20,7 @@ import {
   GRADE_OPTIONS_FOR_ESTIMATE,
   SPLIT_DESIGN_PUBLISH,
   STAGES,
+  WORK_ROLES,
 } from "@/lib/constants";
 import { round1 } from "@/lib/time";
 
@@ -442,7 +443,7 @@ export function EstimatesView() {
               );
               if (!split || !expanded) return [mainRow];
 
-              const childRows = (["디자인", "퍼블"] as const).map((role) => {
+              const childRows = WORK_ROLES.map((role) => {
                 const ratio = computeStageRatioByCategory(
                   data.entries,
                   data.projectStatus,
@@ -451,13 +452,16 @@ export function EstimatesView() {
                   data.staffRole,
                   role
                 );
+                if (role === "기획/마케팅" && !ratio.total) return null;
                 return (
                   <tr
                     key={`${cat}-${role}`}
                     className={
                       role === "디자인"
                         ? "stage-ratio-design"
-                        : "stage-ratio-publish"
+                        : role === "퍼블"
+                          ? "stage-ratio-publish"
+                          : "stage-ratio-planning"
                     }
                   >
                     <td className="stage-ratio-child-cat">

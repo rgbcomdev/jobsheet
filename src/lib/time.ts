@@ -2,6 +2,7 @@ import {
   DESIGN_KEYWORDS,
   PUBLISH_KEYWORDS,
   STAGE_FALLBACK_ROLE,
+  type WorkRole,
 } from "./constants";
 
 export function timeToHours(t: string) {
@@ -69,14 +70,13 @@ export function classifyDesignOrPublish(
   note: string,
   stage: string,
   staffRole: Record<string, string>
-) {
+): WorkRole {
   const role = staffRole[owner];
-  if (role === "디자인") return "디자인";
-  if (role === "퍼블") return "퍼블";
+  if (role === "디자인" || role === "퍼블" || role === "기획/마케팅") return role;
   const n = note || "";
   if (DESIGN_KEYWORDS.some((k) => n.includes(k))) return "디자인";
   if (PUBLISH_KEYWORDS.some((k) => n.includes(k))) return "퍼블";
-  return STAGE_FALLBACK_ROLE[stage] || "디자인";
+  return STAGE_FALLBACK_ROLE[stage] === "퍼블" ? "퍼블" : "디자인";
 }
 
 export function getStaffDailyRate(

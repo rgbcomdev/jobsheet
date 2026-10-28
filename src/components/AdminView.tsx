@@ -9,11 +9,10 @@ import {
   DEFAULT_PROJECT_TYPES_BY_MAJOR,
   GRADE_OPTIONS,
   STAFF_ROLES,
+  TEAMS,
 } from "@/lib/constants";
 import { buildBackupPayload, downloadBackup, parseBackupFile } from "@/lib/backup";
 import { exportAllMonthlyExcel } from "@/lib/excel";
-
-const TEAM_ORDER = ["디자인", "영상"] as const;
 
 export function AdminView() {
   const {
@@ -74,7 +73,7 @@ export function AdminView() {
       string,
       { name: string; team: string; grade: string; role: string; isFormer: boolean }[]
     > = {};
-    for (const team of TEAM_ORDER) {
+    for (const team of TEAMS) {
       const names = data.employees[team] || [];
       out[team] = names
         .filter((name) => {
@@ -91,7 +90,7 @@ export function AdminView() {
     }
     // 기타 팀
     Object.entries(data.employees).forEach(([team, names]) => {
-      if ((TEAM_ORDER as readonly string[]).includes(team)) return;
+      if ((TEAMS as readonly string[]).includes(team)) return;
       out[team] = names
         .filter((name) => {
           const isFormer = data.formerEmployees.includes(name);
@@ -442,10 +441,16 @@ export function AdminView() {
                 <span>팀</span>
                 <select
                   value={regTeam}
-                  onChange={(e) => setRegTeam(e.target.value)}
+                  onChange={(e) => {
+                    setRegTeam(e.target.value);
+                    if (e.target.value === "기획/마케팅") setRegRole("기획/마케팅");
+                  }}
                 >
-                  <option value="디자인">디자인팀</option>
-                  <option value="영상">영상팀</option>
+                  {TEAMS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}팀
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="estimate-field">
@@ -466,7 +471,7 @@ export function AdminView() {
                 <select
                   value={regRole}
                   onChange={(e) => setRegRole(e.target.value)}
-                  title="KPI에서 디자인/퍼블 시간을 나누는 기준입니다"
+                  title="KPI에서 디자인/퍼블/기획·마케팅 시간을 나누는 기준입니다"
                 >
                   <option value="">미지정</option>
                   {STAFF_ROLES.map((r) => (
@@ -877,12 +882,20 @@ export function AdminView() {
                 <label>팀</label>
                 <select
                   value={editForm.team}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, team: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    const team = e.target.value;
+                    setEditForm((f) => ({
+                      ...f,
+                      team,
+                      role: team === "기획/마케팅" ? "기획/마케팅" : f.role,
+                    }));
+                  }}
                 >
-                  <option value="디자인">디자인팀</option>
-                  <option value="영상">영상팀</option>
+                  {TEAMS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}팀
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="emp-edit-row">
@@ -907,7 +920,7 @@ export function AdminView() {
                   onChange={(e) =>
                     setEditForm((f) => ({ ...f, role: e.target.value }))
                   }
-                  title="KPI에서 디자인/퍼블 시간을 나누는 기준입니다"
+                  title="KPI에서 디자인/퍼블/기획·마케팅 시간을 나누는 기준입니다"
                 >
                   <option value="">미지정</option>
                   {STAFF_ROLES.map((r) => (
@@ -989,10 +1002,12 @@ export function AdminView() {
                   onChange={(e) => setAssigneePick(e.target.value)}
                 >
                   <option value="">미지정 (나중에 지정)</option>
-                  {(assigneeModal.major === "동영상"
-                    ? activeEmployeesByTeam["영상"] || []
-                    : activeEmployeesByTeam["디자인"] || []
-                  ).map((n) => (
+                  {[
+                    ...((assigneeModal.major === "동영상"
+                      ? activeEmployeesByTeam["영상"]
+                      : activeEmployeesByTeam["디자인"]) || []),
+                    ...(activeEmployeesByTeam["기획/마케팅"] || []),
+                  ].map((n) => (
                     <option key={n} value={n}>
                       {n}
                     </option>

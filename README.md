@@ -20,7 +20,7 @@ http://localhost:3000
 
 ## Supabase 설정
 
-1. SQL Editor에서 [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) 실행
+1. SQL Editor에서 [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) 실행 (기존 DB는 [`002_planning_team.sql`](supabase/migrations/002_planning_team.sql)만 추가 실행)
 2. `.env.local` 작성:
 
 ```env

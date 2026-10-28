@@ -6,9 +6,9 @@ create extension if not exists "pgcrypto";
 create table if not exists employees (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
-  team text not null check (team in ('디자인', '영상', '미분류')),
+  team text not null check (team in ('디자인', '영상', '기획/마케팅', '미분류')),
   grade text not null default '사원',
-  role text, -- 디자인 | 퍼블 | 겸업
+  role text, -- 디자인 | 퍼블 | 겸업 | 기획/마케팅
   daily_rate_override numeric,
   is_former boolean not null default false,
   sort_order int not null default 0,

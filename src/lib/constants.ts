@@ -59,8 +59,14 @@ export const LEAVE_LABEL_SHORT: Record<string, string> = {
   오후반반차: "오후반반차",
 };
 
-/** KPI 디자인/퍼블 집계 기준 역할. "겸업"은 작업내용으로 세분화한다 */
-export const STAFF_ROLES = ["디자인", "퍼블", "겸업"] as const;
+export const TEAMS = ["디자인", "영상", "기획/마케팅"] as const;
+
+/** KPI 집계 기준 역할. "겸업"은 작업내용으로 디자인/퍼블을 세분화한다 */
+export const STAFF_ROLES = ["디자인", "퍼블", "겸업", "기획/마케팅"] as const;
+
+/** KPI·프로젝트 통계에서 시간을 나눠 담는 항목 */
+export const WORK_ROLES = ["디자인", "퍼블", "기획/마케팅"] as const;
+export type WorkRole = (typeof WORK_ROLES)[number];
 
 /** 날짜가 매년 고정인 공휴일 (설·추석·부처님오신날·대체공휴일은 음력이라 수동 입력) */
 export const FIXED_HOLIDAYS: { md: string; name: string }[] = [

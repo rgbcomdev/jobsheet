@@ -1,4 +1,4 @@
-import { TASK_STAGE_SUFFIX, DEFAULT_PROJECT_TYPES_BY_MAJOR, MAJORS, STAGE_RANK } from "./constants";
+import { TASK_STAGE_SUFFIX, DEFAULT_PROJECT_TYPES_BY_MAJOR, MAJORS, STAGE_RANK, type WorkRole } from "./constants";
 import type { CompanyInfo, WorkEntry } from "./types";
 import { classifyDesignOrPublish, computeDuration, computeOvertime, pad, round1 } from "./time";
 
@@ -120,7 +120,7 @@ export function buildTaskStageBreakdown(
   leaveData: Record<string, string>,
   overrides: Record<string, string>,
   staffRole: Record<string, string>,
-  roleFilter?: "디자인" | "퍼블" | null
+  roleFilter?: WorkRole | null
 ): TaskStageRow[] {
   const rows: Record<
     string,

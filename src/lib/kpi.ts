@@ -1,6 +1,6 @@
 import type { WorkEntry } from "./types";
 import { classifyDesignOrPublish, computeDuration, round1 } from "./time";
-import { projectKey } from "./constants";
+import { projectKey, type WorkRole } from "./constants";
 
 export function computeProjectKPI(
   entries: WorkEntry[],
@@ -16,6 +16,7 @@ export function computeProjectKPI(
       project: string;
       designHours: number;
       publishHours: number;
+      planningHours: number;
       byOwner: Record<string, { hours: number; role: string }>;
     }
   > = {};
@@ -34,12 +35,14 @@ export function computeProjectKPI(
         project: e.project,
         designHours: 0,
         publishHours: 0,
+        planningHours: 0,
         byOwner: {},
       };
     }
     const rec = byKey[key];
     if (role === "디자인") rec.designHours += dur;
-    else rec.publishHours += dur;
+    else if (role === "퍼블") rec.publishHours += dur;
+    else rec.planningHours += dur;
     if (!rec.byOwner[owner]) {
       rec.byOwner[owner] = { hours: 0, role: staffRole[owner] || "미지정" };
     }
@@ -47,7 +50,9 @@ export function computeProjectKPI(
   });
 
   const result = Object.values(byKey).map((rec) => {
-    const totalHours = round1(rec.designHours + rec.publishHours);
+    const totalHours = round1(
+      rec.designHours + rec.publishHours + rec.planningHours
+    );
     const key = projectKey(rec.company, rec.project);
     const estimate = estimates[key];
     const perHour =
@@ -59,6 +64,7 @@ export function computeProjectKPI(
       project: rec.project,
       designHours: round1(rec.designHours),
       publishHours: round1(rec.publishHours),
+      planningHours: round1(rec.planningHours),
       totalHours,
       estimate: estimate || null,
       wonPerHour: perHour,
@@ -137,7 +143,11 @@ export function computeRoleSplitStats(
 ) {
   const design: number[] = [];
   const publish: number[] = [];
-  const byKey: Record<string, { design: number; publish: number }> = {};
+  const planning: number[] = [];
+  const byKey: Record<
+    string,
+    { design: number; publish: number; planning: number }
+  > = {};
 
   entries.forEach((e) => {
     if (!e.company || e.project !== category) return;
@@ -147,14 +157,16 @@ export function computeRoleSplitStats(
     const leave = leaveData[`${owner}|||${e.date}`] || "";
     const dur = computeDuration(e.start, e.end, leave);
     const role = classifyDesignOrPublish(owner, e.note, e.stage, staffRole);
-    if (!byKey[key]) byKey[key] = { design: 0, publish: 0 };
+    if (!byKey[key]) byKey[key] = { design: 0, publish: 0, planning: 0 };
     if (role === "디자인") byKey[key].design += dur;
-    else byKey[key].publish += dur;
+    else if (role === "퍼블") byKey[key].publish += dur;
+    else byKey[key].planning += dur;
   });
 
   Object.values(byKey).forEach((v) => {
     if (v.design > 0) design.push(v.design);
     if (v.publish > 0) publish.push(v.publish);
+    if (v.planning > 0) planning.push(v.planning);
   });
 
   const avg = (arr: number[]) =>
@@ -163,8 +175,10 @@ export function computeRoleSplitStats(
   return {
     designAvg: avg(design),
     publishAvg: avg(publish),
+    planningAvg: avg(planning),
     designCount: design.length,
     publishCount: publish.length,
+    planningCount: planning.length,
   };
 }
 
@@ -174,7 +188,7 @@ export function computeStageRatioByCategory(
   leaveData: Record<string, string>,
   category: string,
   staffRole?: Record<string, string>,
-  roleFilter?: "디자인" | "퍼블"
+  roleFilter?: WorkRole
 ) {
   const stages = { 시안: 0, 본작업: 0, 수정중: 0, 제작중: 0 };
   let total = 0;

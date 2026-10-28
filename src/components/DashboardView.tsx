@@ -71,7 +71,7 @@ export function DashboardView() {
                   "dash-cards" +
                   (team === "디자인"
                     ? " dash-cards-design"
-                    : team === "영상"
+                    : team === "영상" || team === "기획/마케팅"
                       ? " dash-cards-video"
                       : "")
                 }

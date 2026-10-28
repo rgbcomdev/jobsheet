@@ -13,6 +13,7 @@ import { classifyDesignOrPublish, computeDuration, round1 } from "@/lib/time";
 import {
   DEFAULT_PROJECT_TYPES_BY_MAJOR,
   STAGES,
+  WORK_ROLES,
 } from "@/lib/constants";
 import { fmWon } from "@/lib/estimate";
 import { exportTeamKpiExcel } from "@/lib/excel";
@@ -86,11 +87,15 @@ export function TeamKpiView() {
   }, [tab, data.projectTypesByMajor]);
 
   const employeeOptions = useMemo(() => {
-    if (tab === "디자인") return activeEmployeesByTeam["디자인"] || [];
-    if (tab === "동영상") return activeEmployeesByTeam["영상"] || [];
+    const planning = activeEmployeesByTeam["기획/마케팅"] || [];
+    if (tab === "디자인")
+      return [...(activeEmployeesByTeam["디자인"] || []), ...planning];
+    if (tab === "동영상")
+      return [...(activeEmployeesByTeam["영상"] || []), ...planning];
     return [
       ...(activeEmployeesByTeam["디자인"] || []),
       ...(activeEmployeesByTeam["영상"] || []),
+      ...planning,
     ];
   }, [tab, activeEmployeesByTeam]);
 
@@ -484,18 +489,16 @@ export function TeamKpiView() {
                   owners: Set<string>;
                   stages: Record<string, number>;
                 }
-              > = {
-                디자인: {
-                  hours: 0,
-                  owners: new Set(),
-                  stages: { 시안: 0, 본작업: 0, 수정중: 0, 제작중: 0 },
-                },
-                퍼블: {
-                  hours: 0,
-                  owners: new Set(),
-                  stages: { 시안: 0, 본작업: 0, 수정중: 0, 제작중: 0 },
-                },
-              };
+              > = Object.fromEntries(
+                WORK_ROLES.map((r) => [
+                  r,
+                  {
+                    hours: 0,
+                    owners: new Set<string>(),
+                    stages: { 시안: 0, 본작업: 0, 수정중: 0, 제작중: 0 },
+                  },
+                ])
+              );
               data.entries.forEach((e) => {
                 if (e.company !== g.company || e.project !== g.project) return;
                 if (monthPrefix && !e.date.startsWith(monthPrefix)) return;
@@ -522,7 +525,7 @@ export function TeamKpiView() {
                       `${g.company}|||${g.project}|||${employeeFilter}`
                     ] ?? data.estimates[`${g.company}|||${g.project}`]
                   : data.estimates[`${g.company}|||${g.project}`];
-              const roles = (["디자인", "퍼블"] as const).filter(
+              const roles: string[] = WORK_ROLES.filter(
                 (r) => byRole[r].hours > 0
               );
               if (!roles.length) roles.push("디자인");
