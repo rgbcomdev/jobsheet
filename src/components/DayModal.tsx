@@ -16,6 +16,8 @@ import { summarizeNoteForCell } from "@/lib/aggregate";
 import {
   clampEntryToLeaveBounds,
   clampTimeToLeaveBounds,
+  fixInvertedRange,
+  placeNewBlock,
   computeDayTotalHours,
   findInvertedTimeEntry,
   findOverlappingEntries,
@@ -232,12 +234,16 @@ export function DayModal({ owner, date, open, onClose }: Props) {
         const next = { ...r, ...patch };
         next.start = clampTimeToLeaveBounds(next.start, bounds);
         next.end = clampTimeToLeaveBounds(next.end, bounds);
-        if (next.end <= next.start) {
-          // 종료가 시작보다 빠르면 허용 구간 끝으로 맞춤
-          if (bounds.maxEnd) next.end = bounds.maxEnd;
-          if (next.end <= next.start && bounds.minStart) {
-            next.start = bounds.minStart;
-          }
+        if ("start" in patch || "end" in patch) {
+          Object.assign(
+            next,
+            fixInvertedRange(
+              next.start,
+              next.end,
+              "start" in patch ? "start" : "end",
+              bounds
+            )
+          );
         }
         return "start" in patch || "end" in patch
           ? splitEveningBreak(next)
@@ -507,13 +513,19 @@ export function DayModal({ owner, date, open, onClose }: Props) {
         end = "12:00";
       }
     }
+    const placed = placeNewBlock(
+      rows,
+      start,
+      end,
+      getLeaveTimeBounds(leaveType)
+    );
     setRows((prev) => [
       ...prev,
       {
         date,
         owner,
-        start,
-        end,
+        start: placed.start,
+        end: placed.end,
         company: "",
         project: "",
         note: "",

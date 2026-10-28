@@ -76,6 +76,52 @@ export function clampTimeToLeaveBounds(
   return t;
 }
 
+export function shiftTime(time: string, hours: number) {
+  const [h, m] = time.split(":").map(Number);
+  const total = Math.min(24 * 60, Math.max(0, h * 60 + m + hours * 60));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** 시작·종료가 뒤집히면 사용자가 바꾼 쪽은 두고 반대쪽을 1시간 간격으로 맞춘다 */
+export function fixInvertedRange(
+  start: string,
+  end: string,
+  changed: "start" | "end",
+  bounds: { minStart?: string; maxEnd?: string }
+) {
+  if (end > start) return { start, end };
+  const upper = bounds.maxEnd || "24:00";
+  const lower = bounds.minStart || "00:00";
+  if (changed === "start") {
+    const nextEnd = shiftTime(start, 1) > upper ? upper : shiftTime(start, 1);
+    if (nextEnd > start) return { start, end: nextEnd };
+    const s = shiftTime(nextEnd, -1);
+    return { start: s < lower ? lower : s, end: nextEnd };
+  }
+  const nextStart = shiftTime(end, -1) < lower ? lower : shiftTime(end, -1);
+  if (nextStart < end) return { start: nextStart, end };
+  const e = shiftTime(nextStart, 1);
+  return { start: nextStart, end: e > upper ? upper : e };
+}
+
+/** 새 시간 블록이 기존 블록과 겹치면 마지막 블록 뒤(저녁 휴게시간 이후)로 옮긴다 */
+export function placeNewBlock(
+  rows: { start: string; end: string }[],
+  start: string,
+  end: string,
+  bounds: { minStart?: string; maxEnd?: string }
+) {
+  const overlaps = rows.some((r) => start < r.end && r.start < end);
+  if (!overlaps) return { start, end };
+  const lastEnd = rows.reduce((max, r) => (r.end > max ? r.end : max), "00:00");
+  let s = lastEnd >= "18:00" && lastEnd < "19:00" ? "19:00" : lastEnd;
+  if (bounds.minStart && s < bounds.minStart) s = bounds.minStart;
+  const e = shiftTime(s, 1);
+  if (bounds.maxEnd && e > bounds.maxEnd) return { start, end };
+  if (e <= s) return { start, end };
+  return { start: s, end: e };
+}
+
 export function clampEntryToLeaveBounds(
   entry: WorkEntry,
   bounds: { minStart?: string; maxEnd?: string }
